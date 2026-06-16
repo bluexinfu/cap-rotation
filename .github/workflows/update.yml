@@ -1,4 +1,4 @@
-name: update-data
+name: update-data  # 每交易日盤後自動更新資料
 
 on:
   schedule:

@@ -30,6 +30,7 @@
 | R8 | 中性門檻改用各類股自身波動度（如 1 個 σ） | 🟡 P2 | F-V1, F-D | 取代目前 ±固定金額的 hack；可與相對強度模式的 σ 共用 |
 | R6 | 側欄四象限卡加方位標或迷你象限縮圖 | 🟢 P3 | F-V4 | 幫新手把垂直清單對到圖上四角 |
 | R10 | GitHub Actions 更新失敗的通知機制 | 🟢 P3 | F-D4 | 避免靜默失敗（呼應成功指標的「產品健康面」） |
+| R11 | 升級 workflow 的 action 版本（Node.js 20 將被淘汰） | 🟢 P3 | F-D4 | 2026-06-17 首次執行出現 deprecation 警告：`actions/checkout`、`actions/setup-python` 仍跑 Node 20，未來 GitHub 會強制 Node 24。升級這兩個 action 的主版本即可，不影響現行運作 |
 
 ## 長期 / 待評估
 

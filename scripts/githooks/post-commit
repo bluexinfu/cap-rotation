@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# post-commit hook：每次本機 commit 後，自動刷新 repo 上一層的「專案狀態.md」狀態快照。
+# 放在版本控制內（scripts/githooks/），用 core.hooksPath 啟用，reclone 後重設一次即可。
+#
+# 安全原則：
+#   - CI（GitHub Actions）環境直接跳過，不干擾每日 data.json 自動 commit。
+#   - 任何錯誤都 exit 0，絕不影響 commit 結果。
+#   - 專案狀態.md 不在 repo 內，所以這裡不需要 git add，也不會改動 git 歷史。
+
+# CI 跳過
+if [ -n "$GITHUB_ACTIONS" ] || [ -n "$CI" ]; then
+  exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+
+PY="$(command -v python3 || command -v python)"
+[ -z "$PY" ] && exit 0
+
+"$PY" "$REPO_ROOT/scripts/gen_status_block.py" >/dev/null 2>&1 || true
+exit 0

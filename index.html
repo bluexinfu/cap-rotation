@@ -301,8 +301,9 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
         <div class="cright">
           <span class="infohelp" tabindex="0">ⓘ 圖表說明<div class="infopop">
             <h5>怎麼看這張圖</h5>
-            <b>橫軸｜近5日淨買超（億）</b>：<span class="pos">右＝資金流入</span>、<span class="neg">左＝流出</span>。<br>
-            <b>縱軸｜資金動能（力道變化·億/天）</b>：上＝買盤加速、下＝放緩。這是「速度的變化」，<b>不是方向</b>——往下只代表力道變小，<b>不等於流出</b>。<br>
+            <div style="margin-bottom:8px"><b>一句話</b>：橫軸看資金現在「<b>在哪</b>」（位置）、縱軸看力道「<b>正在怎麼變</b>」（動能）。兩軸同單位（億/天），<b>縱軸就是橫軸的變化</b>。</div>
+            <b>橫軸｜近5日日均淨買（億/天）</b>：<span class="pos">右＝資金流入</span>、<span class="neg">左＝流出</span>。用5天平均、壓掉單日大單雜訊。<br>
+            <b>縱軸｜力道變化（本週日均 − 上週日均·億/天）</b>：<span class="pos">往上＝比上週更偏買</span>（買更多或賣更少）、<span class="neg">往下＝更偏賣</span>（買更少或賣更多）。這是力道的「變化」、<b>不是方向</b>。「加速／放緩」要<b>配合橫軸</b>看：右邊（在買）往上＝買盤加速、左邊（在賣）往下＝賣壓加速。<br>
             <b>圈圈</b>：大小＝近20日資金量級、顏色＝近5日方向（兩個週期）。<br>
             <br><b>四象限</b>（順時針輪動）<br>
             ⭐ <b>漲潮</b>（右上）：流入且加速，最強<br>
@@ -316,7 +317,7 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
       </div>
       <div class="guidebar" id="guidebar">
         <span>📍 <b>橫軸</b>＝近5日資金多寡（<span class="pos">右買</span>·<span class="neg">左賣</span>）</span><span class="sep">｜</span>
-        <span><b>縱軸</b>＝力道變化（上加速·下放緩，<b>非</b>方向）</span><span class="sep">｜</span>
+        <span><b>縱軸</b>＝力道變化（上＝更偏買·下＝更偏賣，<b>非</b>方向）</span><span class="sep">｜</span>
         <span><b>圈大小</b>＝20日量</span><span class="sep">｜</span>
         <span><b>顏色</b>＝5日方向</span><span class="sep">｜</span>
         <span>▶ 播放看輪動·點泡泡看K線</span>
@@ -364,8 +365,9 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
     <p>它追蹤<b>三大法人（外資、投信、自營商）的資金</b>，正流向台股哪些<b>板塊</b>、又正從哪些板塊撤出，並把「<b>流入多寡</b>」與「<b>力道是加速還是放緩</b>」同時畫在一張圖上，幫你看出資金的<b>輪動</b>。</p>
 
     <h4>2. 兩個軸怎麼讀</h4>
-    <p><b>橫軸（左右）＝近5日資金多寡。</b><span class="pos">越右＝法人買越多</span>，<span class="neg">越左＝賣越多</span>，中間是零（沒進沒出）。</p>
-    <p><b>縱軸（上下）＝資金力道的「變化」。</b>往上＝買的力道在<b>加速</b>，往下＝力道在<b>放緩</b>。⚠️ 這是<b>速度的變化、不是方向</b>：一個板塊可以「還在買（在右邊）但力氣變小（往下掉）」。<b>減速 ≠ 倒車。</b></p>
+    <p class="note"><b>先記住一句話：橫軸看資金「在哪」（位置），縱軸看力道「正在怎麼變」（動能）。</b>兩軸都用同一個單位<b>億/天</b>，所以<b>縱軸其實就是橫軸的變化</b>——這也是為什麼橫軸用「<b>日均</b>」而非「5天總和」：要和縱軸對齊，兩個數字才好互相對照。</p>
+    <p><b>橫軸（左右）＝近5日「日均」淨買超（億/天）。</b><span class="pos">越右＝法人每天平均買越多</span>，<span class="neg">越左＝賣越多</span>，中間是零（沒進沒出）。用<b>5天平均</b>是為了壓掉單日大單的雜訊，看的是一段趨勢而非單點。</p>
+    <p><b>縱軸（上下）＝資金力道的「變化」（動能）。</b>往上＝比上週<b>更偏買方</b>（買更多、或賣更少），往下＝<b>更偏賣方</b>（買更少、或賣更多）。公式就是「本週日均淨買超 − 上週日均」。⚠️ 這是<b>變化、不是方向</b>：一個板塊可以「還在買（在右邊）但力氣變小（往下掉）」。至於「加速／放緩」要<b>配合橫軸一起看</b>——右邊往上＝買盤加速、左邊往下＝賣壓加速；<b>減速 ≠ 倒車。</b></p>
 
     <h4>3. 圈圈代表什麼</h4>
     <p><b>大小</b>＝近20日累積資金量（越大＝中期進出的錢越多）。<b>顏色</b>＝近5日方向（<span class="pos">紅/橘＝流入</span>、<span class="neg">綠＝流出</span>，可在設定切換紅綠）。注意大小看20日、顏色看5日，是<b>兩個不同週期</b>。</p>
@@ -385,7 +387,7 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
       <li><b>⏮ 上一天 / ⏭ 下一天</b>（或鍵盤 ← →，空白鍵播放/暫停）：逐日定格細看每一天的變化。</li>
       <li><b>點泡泡</b>：把該板塊釘到右側看 K 線，對照「資金」與「股價」。</li>
       <li><b>點左側象限格</b>：只看該象限的板塊。</li>
-      <li><b>金額(億) ↔ 相對強度</b>（右上切換）：「金額」看真實資金量；「相對強度」用各板塊<b>自身波動</b>標準化，避免半導體等大型股永遠最大、小板塊擠在中間——想比較「誰在輪動」時用它。</li>
+      <li><b>金額(億) ↔ 相對強度</b>（右上切換）：<b>金額</b>看真實資金量，直覺、貼近「實際幾億」；但大板塊（半導體等）盤子大，天生就被推到外圍，<b>不代表真在輪動</b>。<b>相對強度</b>用各板塊<b>自身波動</b>標準化，把大小板塊放到同一把尺上——<b>想公平比較「資金正輪動進誰」時，用這個才準。</b></li>
       <li><b>搜尋 / 設定</b>：找特定板塊、改顏色與字級。</li>
     </ul>
 
@@ -465,7 +467,7 @@ function fmtDate(d){return `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;}
 function mmdd(d){return `${d.slice(4,6)}/${d.slice(6,8)}`;}
 
 /* ===== metrics ===== */
-function roll5(s,i){let a=0;for(let j=Math.max(0,i-WIN+1);j<=i;j++)a+=s[j];return a;}
+function roll5(s,i){let a=0,c=0;for(let j=Math.max(0,i-WIN+1);j<=i;j++){a+=s[j];c++;}return c?a/c:0;} /* 近5日「日均」淨買超(億/天)，與縱軸同單位 */
 function accel(s,i){let r=0,rc=0,p=0,pc=0;
   for(let j=Math.max(0,i-WIN+1);j<=i;j++){r+=s[j];rc++;}
   for(let j=Math.max(0,i-WIN-BASE+1);j<=i-WIN;j++){p+=s[j];pc++;}
@@ -486,8 +488,8 @@ const txf=v=>Math.sign(v)*Math.log10(1+Math.abs(v)/LTX);
 const tyf=v=>Math.sign(v)*Math.log10(1+Math.abs(v)/LTY);
 /* 兩種座標尺度：金額(絕對億) / 相對強度(各板塊÷自身波動) */
 const TKCFG={
-  abs:{xt:[-1000,-500,-200,-100,-50,-20,-5,0,5,20,50,100,200,500],yt:[-200,-100,-50,-20,-10,-5,-1,0,1,5,10,20,50],ltx:5,lty:1,
-       xlab:'← 資金流出　近5日淨買超（億）　資金流入 →',ylab:'資金動能（力道變化·億/天）'},
+  abs:{xt:[-200,-100,-50,-20,-10,-5,-1,0,1,5,10,20,50,100],yt:[-200,-100,-50,-20,-10,-5,-1,0,1,5,10,20,50],ltx:1,lty:1,
+       xlab:'← 資金流出　近5日日均淨買（億/天）　資金流入 →',ylab:'力道變化（本週日均 − 上週日均·億/天）'},
   rel:{xt:[-20,-10,-5,-2,-1,0,1,2,5,10,20],yt:[-5,-2,-1,-0.5,0,0.5,1,2,5],ltx:1,lty:0.5,
        xlab:'← 賣壓　近5日相對強度（×自身波動）　買盤 →',ylab:'資金動能（相對·×自身波動）'}};
 function tkcfg(){return S.norm?TKCFG.rel:TKCFG.abs;}
@@ -579,7 +581,7 @@ function showTip(e,sec){const i=S.cur,m=metrics(sec,i),q=quad(m.x,m.y);
   const tip=document.getElementById('tip'),wrap=document.getElementById('stage').getBoundingClientRect();
   tip.style.display='block';
   tip.innerHTML=`<b>${sec.sector}</b>
-   <div class="l"><span>近5日淨買超</span><span style="color:${m.x>=0?'var(--in)':'var(--out)'}">${fmt(m.x)} 億</span></div>
+   <div class="l"><span>近5日日均</span><span style="color:${m.x>=0?'var(--in)':'var(--out)'}">${fmt(m.x)} 億/天</span></div>
    <div class="l"><span>近20日累計</span><span style="color:${m.sz>=0?'var(--in)':'var(--out)'}">${fmt(m.sz)} 億</span></div>
    <div class="l"><span>動能(力道變化)</span><span style="color:${m.y>=0?'var(--in)':'var(--out)'}">${fmt(m.y)} 億/天</span></div>
    ${S.norm?`<div class="l"><span>相對強度</span><span>${fmt(m.x/sigma(sec))} σ</span></div>`:''}
@@ -704,7 +706,7 @@ function renderHeat(){const ws=winStart(),we=LAST();const dts=DATA.dates.slice(w
 let sortKey='x',sortDir=-1;
 function renderRank(){const i=S.cur,snap=snapshot(i).filter(s=>!S.hidden.has(s.sector));
   snap.sort((a,b)=>sortDir*(a[sortKey]-b[sortKey]));
-  const cols=[['sector','板塊'],['x','近5日(億)'],['sz','近20日(億)'],['y','動能'],['q','象限']];
+  const cols=[['sector','板塊'],['x','近5日日均'],['sz','近20日(億)'],['y','動能'],['q','象限']];
   let h='<thead><tr>';cols.forEach(([k,t])=>h+=`<th class="${k===sortKey?'sorted':''}" onclick="setSort('${k}')">${t}</th>`);h+='</tr></thead><tbody>';
   snap.forEach(s=>{const c=col(s.x);h+=`<tr onclick="togglePin('${s.sector}')"><td><span class="dotc" style="background:${c.f}"></span>${s.sector}${S.pinned.has(s.sector)?' 📌':''}</td>
     <td class="${s.x>=0?'pos':'neg'}">${fmt(s.x)}</td><td class="${s.sz>=0?'pos':'neg'}">${fmt(s.sz)}</td>

@@ -11,6 +11,13 @@
 > 已規劃或進行中、尚未發版的改動。發版時把本區塊改名為新版本號 + 日期。
 > 目前待辦見 [docs/ROADMAP.md](docs/ROADMAP.md)（R6 起）。
 
+### Changed
+- **Y 軸動能改用 EMA 輕平滑，減少假象限翻轉**（R7）：對各板塊日淨買序列先做指數加權平滑（EMA，span=3）再照 5 日窗計算 X 與 Y。日與日之間的象限翻轉率由 **30.6% 降到 24.5%**（約少 1/5 假訊號）。因 X、Y 用同一條平滑序列同窗長，**`Y ≡ X(今) − X(五日前)` 恆等**（已驗證誤差 0），[ADR-0004](docs/decisions/ADR-0004-x-axis-daily-average.md) 的「Y＝X 的變化」自洽完全保留。圈大小 `sz`（近20日累計實際金額）**維持原始未平滑**。選 span=3（輕）而非 span=5（重）是為守住「早點看到苗頭」定位、避免拖慢真實轉折。設計理由見 [ADR-0005](docs/decisions/ADR-0005-ema-smoothing-momentum.md)。
+
+### Docs
+- ⓘ 圖表說明、新手指南、資訊卡、排行榜欄位標示 X 為「平滑趨勢值」並解釋（先 EMA 平滑再取均、壓單日大單雜訊），守住「不誤導」原則。
+- 新增 [ADR-0005](docs/decisions/ADR-0005-ema-smoothing-momentum.md)；ROADMAP **R7** 標為已處理。
+
 ---
 
 ## [0.2.1] - 2026-06-18

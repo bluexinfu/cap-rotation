@@ -302,7 +302,7 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
           <span class="infohelp" tabindex="0">ⓘ 圖表說明<div class="infopop">
             <h5>怎麼看這張圖</h5>
             <div style="margin-bottom:8px"><b>一句話</b>：橫軸看資金現在「<b>在哪</b>」（位置）、縱軸看力道「<b>正在怎麼變</b>」（動能）。兩軸同單位（億/天），<b>縱軸就是橫軸的變化</b>。</div>
-            <b>橫軸｜近5日日均淨買（億/天）</b>：<span class="pos">右＝資金流入</span>、<span class="neg">左＝流出</span>。用5天平均、壓掉單日大單雜訊。<br>
+            <b>橫軸｜近5日日均淨買（億/天，平滑）</b>：<span class="pos">右＝資金流入</span>、<span class="neg">左＝流出</span>。先做指數加權平滑(EMA)再取5日均，故為<b>趨勢值</b>、能壓掉單日大單雜訊。<br>
             <b>縱軸｜力道變化（本週日均 − 上週日均·億/天）</b>：<span class="pos">往上＝比上週更偏買</span>（買更多或賣更少）、<span class="neg">往下＝更偏賣</span>（買更少或賣更多）。這是力道的「變化」、<b>不是方向</b>。「加速／放緩」要<b>配合橫軸</b>看：右邊（在買）往上＝買盤加速、左邊（在賣）往下＝賣壓加速。<br>
             <b>圈圈</b>：大小＝近20日資金量級、顏色＝近5日方向（兩個週期）。<br>
             <br><b>四象限</b>（順時針輪動）<br>
@@ -366,8 +366,8 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
 
     <h4>2. 兩個軸怎麼讀</h4>
     <p class="note"><b>先記住一句話：橫軸看資金「在哪」（位置），縱軸看力道「正在怎麼變」（動能）。</b>兩軸都用同一個單位<b>億/天</b>，所以<b>縱軸其實就是橫軸的變化</b>——這也是為什麼橫軸用「<b>日均</b>」而非「5天總和」：要和縱軸對齊，兩個數字才好互相對照。</p>
-    <p><b>橫軸（左右）＝近5日「日均」淨買超（億/天）。</b><span class="pos">越右＝法人每天平均買越多</span>，<span class="neg">越左＝賣越多</span>，中間是零（沒進沒出）。用<b>5天平均</b>是為了壓掉單日大單的雜訊，看的是一段趨勢而非單點。</p>
-    <p><b>縱軸（上下）＝資金力道的「變化」（動能）。</b>往上＝比上週<b>更偏買方</b>（買更多、或賣更少），往下＝<b>更偏賣方</b>（買更少、或賣更多）。公式就是「本週日均淨買超 − 上週日均」。⚠️ 這是<b>變化、不是方向</b>：一個板塊可以「還在買（在右邊）但力氣變小（往下掉）」。至於「加速／放緩」要<b>配合橫軸一起看</b>——右邊往上＝買盤加速、左邊往下＝賣壓加速；<b>減速 ≠ 倒車。</b></p>
+    <p><b>橫軸（左右）＝近5日「日均」淨買超（億/天，平滑趨勢值）。</b><span class="pos">越右＝法人每天平均買越多</span>，<span class="neg">越左＝賣越多</span>，中間是零（沒進沒出）。為了壓掉單日大單造成的假跳動，先對每日淨買做<b>指數加權平滑（EMA，近的日子權重高）</b>、再取5天平均——所以這個數字是<b>平滑後的趨勢值</b>，不是把原始5天加起來除以5的算術平均。看的是一段趨勢而非單點。</p>
+    <p><b>縱軸（上下）＝資金力道的「變化」（動能）。</b>往上＝比上週<b>更偏買方</b>（買更多、或賣更少），往下＝<b>更偏賣方</b>（買更少、或賣更多）。公式就是「本週日均淨買超 − 上週日均」（同樣以平滑後序列計算，故 Y 仍恰好是橫軸的變化）。⚠️ 這是<b>變化、不是方向</b>：一個板塊可以「還在買（在右邊）但力氣變小（往下掉）」。至於「加速／放緩」要<b>配合橫軸一起看</b>——右邊往上＝買盤加速、左邊往下＝賣壓加速；<b>減速 ≠ 倒車。</b></p>
 
     <h4>3. 圈圈代表什麼</h4>
     <p><b>大小</b>＝近20日累積資金量（越大＝中期進出的錢越多）。<b>顏色</b>＝近5日方向（<span class="pos">紅/橘＝流入</span>、<span class="neg">綠＝流出</span>，可在設定切換紅綠）。注意大小看20日、顏色看5日，是<b>兩個不同週期</b>。</p>
@@ -454,7 +454,7 @@ function setDims(){
   PW=W-M.l-M.r;PH=H-M.t-M.b;
   var s=document.getElementById('svg');if(s)s.setAttribute('viewBox','0 0 '+W+' '+H);
 }
-const WIN=5,BASE=5,CUM=20,I0=WIN+BASE-1;
+const WIN=5,BASE=5,CUM=20,I0=WIN+BASE-1,EMA_SPAN=3;
 const S={tab:'map',color:'tw',trail:6,labels:true,search:'',hidden:new Set(),pinned:new Set(),
   range:40, kmode:{}, cur:0,pos:0, playing:false,spd:1.4,raf:null,lastT:null, qfilter:null, norm:false};
 const QNAME={chao:'漲潮',lun:'輪動',guan:'觀望',tui:'退潮'};
@@ -473,7 +473,11 @@ function accel(s,i){let r=0,rc=0,p=0,pc=0;
   for(let j=Math.max(0,i-WIN-BASE+1);j<=i-WIN;j++){p+=s[j];pc++;}
   return (rc?r/rc:0)-(pc?p/pc:0);}
 function cum20(s,i){let a=0;for(let j=Math.max(0,i-CUM+1);j<=i;j++)a+=s[j];return a;}
-function metrics(sec,i){const s=sec.series;return{x:roll5(s,i),y:accel(s,i),sz:cum20(s,i)};}
+/* R7：對日淨買序列做 EMA(span=EMA_SPAN=3，輕平滑) 指數加權平滑，壓掉單日大單造成的假象限翻轉（30.6%→約24.5%），同時不過度拖慢真實轉折。
+   平滑只用於 X(位置) 與 Y(動能)，故 Y 仍恰為平滑後 X 的週對週變化（Y=ΔX 自洽不破）；
+   sz(近20日累計實際金額) 維持「原始未平滑」，因它代表真實進出的錢，平滑會失真。設計理由見 ADR-0005。 */
+function emaSeries(sec){if(sec._sm==null){const s=sec.series,k=2/(EMA_SPAN+1),o=new Array(s.length);let m=s.length?s[0]:0;for(let i=0;i<s.length;i++){m=s[i]*k+m*(1-k);o[i]=m;}sec._sm=o;}return sec._sm;}
+function metrics(sec,i){const sm=emaSeries(sec);return{x:roll5(sm,i),y:accel(sm,i),sz:cum20(sec.series,i)};}
 /* 各板塊以「自身日淨買超標準差」為尺度，標準化後可跨板塊比較（消除大型股偏誤）；不減均值故正負號不變，象限歸屬與絕對模式一致 */
 function sigma(sec){if(sec._sig==null){const s=sec.series,n=s.length||1;let m=0;for(const v of s)m+=v;m/=n;let q=0;for(const v of s)q+=(v-m)*(v-m);sec._sig=Math.sqrt(q/n)||1;}return sec._sig;}
 function mnorm(m,sec){if(!S.norm)return m;const g=sigma(sec);return{x:m.x/g,y:m.y/g,sz:m.sz/g};}
@@ -581,7 +585,7 @@ function showTip(e,sec){const i=S.cur,m=metrics(sec,i),q=quad(m.x,m.y);
   const tip=document.getElementById('tip'),wrap=document.getElementById('stage').getBoundingClientRect();
   tip.style.display='block';
   tip.innerHTML=`<b>${sec.sector}</b>
-   <div class="l"><span>近5日日均</span><span style="color:${m.x>=0?'var(--in)':'var(--out)'}">${fmt(m.x)} 億/天</span></div>
+   <div class="l"><span>近5日日均(平滑)</span><span style="color:${m.x>=0?'var(--in)':'var(--out)'}">${fmt(m.x)} 億/天</span></div>
    <div class="l"><span>近20日累計</span><span style="color:${m.sz>=0?'var(--in)':'var(--out)'}">${fmt(m.sz)} 億</span></div>
    <div class="l"><span>動能(力道變化)</span><span style="color:${m.y>=0?'var(--in)':'var(--out)'}">${fmt(m.y)} 億/天</span></div>
    ${S.norm?`<div class="l"><span>相對強度</span><span>${fmt(m.x/sigma(sec))} σ</span></div>`:''}
@@ -706,7 +710,7 @@ function renderHeat(){const ws=winStart(),we=LAST();const dts=DATA.dates.slice(w
 let sortKey='x',sortDir=-1;
 function renderRank(){const i=S.cur,snap=snapshot(i).filter(s=>!S.hidden.has(s.sector));
   snap.sort((a,b)=>sortDir*(a[sortKey]-b[sortKey]));
-  const cols=[['sector','板塊'],['x','近5日日均'],['sz','近20日(億)'],['y','動能'],['q','象限']];
+  const cols=[['sector','板塊'],['x','近5日日均(平滑)'],['sz','近20日(億)'],['y','動能'],['q','象限']];
   let h='<thead><tr>';cols.forEach(([k,t])=>h+=`<th class="${k===sortKey?'sorted':''}" onclick="setSort('${k}')">${t}</th>`);h+='</tr></thead><tbody>';
   snap.forEach(s=>{const c=col(s.x);h+=`<tr onclick="togglePin('${s.sector}')"><td><span class="dotc" style="background:${c.f}"></span>${s.sector}${S.pinned.has(s.sector)?' 📌':''}</td>
     <td class="${s.x>=0?'pos':'neg'}">${fmt(s.x)}</td><td class="${s.sz>=0?'pos':'neg'}">${fmt(s.sz)}</td>

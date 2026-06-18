@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>資金輪動 · 板塊趨勢</title>
+<title>資金動向觀測 · 台股板塊 × AI 主題</title>
 <style>
 :root{
   --bg:#0a1310; --bg2:#0e1814; --panel:#121e18; --panel2:#18271f; --line:#243329;
@@ -112,10 +112,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .tip .l span:last-child{font-weight:700}
 
 /* right K-line column */
+.splitter{width:8px;flex-shrink:0;cursor:col-resize;align-self:stretch;display:flex;align-items:center;justify-content:center}
+.splitter::before{content:"";width:3px;height:48px;border-radius:3px;background:var(--line);transition:.15s}
+.splitter:hover::before,.splitter.drag::before{background:var(--accent);height:72px}
 .kside{width:320px;flex-shrink:0;background:var(--panel);border:1px solid var(--line);border-radius:16px;
   display:flex;flex-direction:column;min-height:0;box-shadow:var(--shadow)}
 .kside h4{margin:0;padding:12px 14px 8px;font-size:.92em;display:flex;justify-content:space-between;align-items:center}
-.kside .addbtn{background:var(--bg2);border:1px solid var(--line);border-radius:8px;color:var(--accent);font-size:.78em;padding:4px 10px}
+.kside .addbtn{background:var(--bg2);border:1px solid var(--line);border-radius:8px;color:var(--accent);font-size:.78em;padding:4px 10px;cursor:pointer}
+.kside .addbtn:hover{border-color:var(--accent)}
+.kside .addbtn.on{background:var(--accent);border-color:var(--accent);color:#06251c;font-weight:700}
 .kscroll{flex:1;overflow:auto;padding:0 12px 12px;display:flex;flex-direction:column;gap:10px}
 .kempty{color:var(--muted2);font-size:.82em;text-align:center;padding:30px 10px;line-height:1.7}
 .kcard{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:10px;flex-shrink:0}
@@ -132,6 +137,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .kpin{background:none;border:none;color:var(--muted2);font-size:1em;padding:0 2px}
 .kpin:hover{color:var(--in)}
 .kchart{width:100%;height:120px;display:block}
+.kchart.kchart-ai{height:178px}
 .kcursor{stroke:#fff;stroke-width:1.4;opacity:.85}
 .kaxis{fill:var(--muted2);font-size:9px}
 
@@ -170,16 +176,18 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
 
 /* ===== 新手說明元件 ===== */
 .sidebar{width:178px}
-.qmap{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:7px;flex:0 0 auto}
-.qmap .caphint{grid-column:1/3;font-size:.62em;color:var(--muted2);text-align:center;margin-bottom:-2px}
-.qcell{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;
-  padding:9px 8px 7px;cursor:pointer;transition:.15s;border-top:3px solid var(--line);overflow:hidden;min-height:0}
+/* 四象限統計：圖表上方一排「緊湊小按鈕」；4 顆置中（說明小字絕對定位、不算進置中寬度），並貼近圖表 */
+.qmap{position:relative;display:flex;justify-content:center;padding:22px 16px 6px;margin-bottom:-8px}
+.qmap .qcells{display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:7px}
+.qmap .caphint{align-self:center;font-size:.58em;color:var(--muted2);line-height:1.25;white-space:nowrap;margin-right:3px;flex:0 0 auto}
+.qcell{flex:0 0 auto;width:104px;position:relative;background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:5px 10px;cursor:pointer;transition:.15s;border-top:3px solid var(--line);overflow:hidden}
 .qcell:hover{background:var(--panel2);transform:translateY(-1px)}
 .qcell.active{box-shadow:inset 0 0 0 1px var(--accent)}
-.qcell .ori{position:absolute;top:6px;right:8px;font-size:.58em;color:var(--muted2);font-weight:700}
-.qcell .t{font-size:.86em;font-weight:800}
-.qcell .n{font-size:1.5em;font-weight:800;line-height:1.1}
-.qcell .d{font-size:.62em;color:var(--muted)}
+.qcell .ori{position:absolute;top:4px;right:7px;font-size:.5em;color:var(--muted2);font-weight:700}
+.qcell .t{font-size:.74em;font-weight:800}
+.qcell .n{font-size:1.15em;font-weight:800;line-height:1.1}
+.qcell .d{font-size:.54em;color:var(--muted)}
 .qcell.chao{border-top-color:var(--in)} .qcell.chao .t,.qcell.chao .n{color:var(--in)}
 .qcell.lun{border-top-color:var(--neu)} .qcell.lun .t,.qcell.lun .n{color:var(--neu)}
 .qcell.guan{border-top-color:var(--grey)} .qcell.guan .t,.qcell.guan .n{color:var(--grey)}
@@ -253,9 +261,13 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
   input[type=range]{height:8px}
   input[type=range]::-webkit-slider-thumb{width:20px;height:20px}
   /* K 線移到圖表下方堆疊 */
-  .kside{display:flex;width:auto;order:3;max-height:none}
+  .splitter{display:none}
+  .qmap{padding:10px 12px 6px;margin-bottom:0}
+  .qmap .qcells{flex-wrap:wrap}
+  .kside{display:flex;width:auto !important;order:3;max-height:none}
   .kscroll{max-height:none;overflow:visible}
   .kchart{height:130px}
+  .kchart.kchart-ai{height:188px}
   /* 設定/彈窗 */
   .box{padding:18px;border-radius:16px}
   .toggle-list{grid-template-columns:1fr 1fr}
@@ -265,12 +277,16 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
 <body>
 <div class="app">
   <div class="hdr">
-    <div class="brand"><h1>資金輪動</h1><span class="sub">台股板塊 · 三大法人資金流趨勢</span></div>
+    <div class="brand"><h1>資金動向觀測</h1><span class="sub">台股板塊 × AI 主題輪動 · 三大法人資金流</span></div>
     <div class="right">
       <div class="rangesel" id="rangeSel">
         <button data-r="20" onclick="setRange(20)">20日</button>
         <button data-r="40" class="on" onclick="setRange(40)">40日</button>
         <button data-r="60" onclick="setRange(60)">60日</button>
+      </div>
+      <div class="rangesel" id="dimSel" title="分群維度：證交所產業＝官方產業別；AI 主題＝依 AI 供應鏈子題分群（觀察用，非選股建議），點主題可看成員個股 K 線">
+        <button data-d="twse" class="on" onclick="setDim('twse')">證交所產業</button>
+        <button data-d="ai" onclick="setDim('ai')">AI 主題</button>
       </div>
       <div class="rangesel" id="normSel" title="座標尺度：金額看真實資金量；相對強度把各板塊用自身波動標準化，消除大型股永遠最大的偏誤，較適合比較『輪動』">
         <button data-n="0" class="on" onclick="setNorm(false)">金額(億)</button>
@@ -284,13 +300,9 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
     </div>
   </div>
 
-  <div class="summary"><span class="chipline">📅 <b id="curDate">—</b>　|　近5日買超王 <span class="pos" id="sBuy">—</span>　賣超王 <span class="neg" id="sSell">—</span>　|　淨流入 <b id="sIn">—</b> 板塊・淨流出 <b id="sOut">—</b> 板塊</span></div>
+  <div class="summary"><span class="chipline">📅 檢視日 <b id="curDate">—</b>　|　近5日買超王 <span class="pos" id="sBuy">—</span>　賣超王 <span class="neg" id="sSell">—</span>　|　淨流入 <b id="sIn">—</b> 板塊・淨流出 <b id="sOut">—</b> 板塊</span></div>
 
   <div class="main">
-    <div class="sidebar">
-      <div class="qmap" id="qmap"></div>
-    </div>
-
     <div class="center">
       <div class="chead">
         <div class="tabs">
@@ -322,6 +334,7 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
         <span><b>顏色</b>＝5日方向</span><span class="sep">｜</span>
         <span>▶ 播放看輪動·點泡泡看K線</span>
       </div>
+      <div class="qmap" id="qmap"></div>
       <div class="stage" id="stage">
         <svg class="chart" id="svg" viewBox="0 0 1000 620" preserveAspectRatio="xMidYMid meet"></svg>
         <div class="tip" id="tip"></div>
@@ -346,9 +359,10 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
       <div class="foot">資料：臺灣證券交易所 三大法人買賣超(T86)＋每日收盤行情 ｜ 僅供參考，不構成投資建議</div>
     </div>
 
+    <div class="splitter" id="splitter" title="拖曳左右調整 K 線區寬度（最多放大兩倍）"></div>
     <div class="kside" id="kside">
-      <h4>📈 產業 K 線 <button class="addbtn" onclick="openModal('mPick')">＋ 選擇板塊</button></h4>
-      <div class="kdesc">看資金流入的板塊「價格表現如何」。每張卡可切換兩種視角：<br>
+      <h4 id="ksideTitle">📈 產業 K 線 <button class="addbtn" onclick="openModal('mPick')">＋ 選擇板塊</button></h4>
+      <div class="kdesc" id="ksideDesc">看資金流入的板塊「價格表現如何」。每張卡可切換兩種視角：<br>
         <b>個股</b>＝該板塊<b>龍頭股</b>（這段期間<b>成交金額最大</b>的個股）的日 K 棒；<br>
         <b>指數</b>＝該板塊<b>類股指數</b>的走勢線。漲跌顏色依你的設定。</div>
       <div class="kscroll" id="kscroll"></div>
@@ -456,7 +470,7 @@ function setDims(){
 }
 const WIN=5,BASE=5,CUM=20,I0=WIN+BASE-1,EMA_SPAN=3;
 const S={tab:'map',color:'tw',trail:6,labels:true,search:'',hidden:new Set(),pinned:new Set(),
-  range:40, kmode:{}, cur:0,pos:0, playing:false,spd:1.4,raf:null,lastT:null, qfilter:null, norm:false};
+  range:40, kmode:{}, cur:0,pos:0, playing:false,spd:1.4,raf:null,lastT:null, qfilter:null, norm:false, dim:'twse', ksideW:0, showIndex:false};
 const QNAME={chao:'漲潮',lun:'輪動',guan:'觀望',tui:'退潮'};
 const QORI={chao:'右上',lun:'右下',guan:'左上',tui:'左下'};
 let SECID={};
@@ -498,8 +512,10 @@ const TKCFG={
        xlab:'← 賣壓　近5日相對強度（×自身波動）　買盤 →',ylab:'資金動能（相對·×自身波動）'}};
 function tkcfg(){return S.norm?TKCFG.rel:TKCFG.abs;}
 let XR,YR,MAXSZ;
+/* 目前維度的板塊（證交所產業 twse / AI 主題 ai）。沒有 dim 欄位的視為 twse，向後相容。 */
+function curSectors(){return DATA.sectors.filter(s=>(s.dim||'twse')===S.dim);}
 function computeDomain(){const C=tkcfg();LTX=C.ltx;LTY=C.lty;let xs=[],ys=[],sz=[];
-  DATA.sectors.forEach(sec=>{for(let i=I0;i<DATA.dates.length;i++){const m=mnorm(metrics(sec,i),sec);xs.push(txf(m.x));ys.push(tyf(m.y));sz.push(Math.abs(m.sz));}});
+  curSectors().forEach(sec=>{for(let i=I0;i<DATA.dates.length;i++){const m=mnorm(metrics(sec,i),sec);xs.push(txf(m.x));ys.push(tyf(m.y));sz.push(Math.abs(m.sz));}});
   const pad=a=>{let mn=Math.min(...a),mx=Math.max(...a),sp=(mx-mn)||1;return[mn-sp*0.1,mx+sp*0.1];};
   XR=pad(xs);YR=pad(ys);MAXSZ=Math.max(...sz,1);}
 const sx=v=>M.l+(txf(v)-XR[0])/(XR[1]-XR[0])*PW;
@@ -534,7 +550,7 @@ function staticLayer(){let g='';const bx=sx(0),by=sy(0);
 function buildMap(){const svg=document.getElementById('svg');svg.innerHTML='';
   const gs=document.createElementNS(NS,'g');gs.innerHTML=staticLayer();svg.appendChild(gs);
   const gb=document.createElementNS(NS,'g');gb.setAttribute('id','bubL');svg.appendChild(gb);nodes={};
-  DATA.sectors.forEach(sec=>{const g=document.createElementNS(NS,'g');g.setAttribute('class','bub');g.dataset.s=sec.sector;
+  curSectors().forEach(sec=>{const g=document.createElementNS(NS,'g');g.setAttribute('class','bub');g.dataset.s=sec.sector;
     const trail=document.createElementNS(NS,'polyline');trail.setAttribute('class','trail');
     const dot=document.createElementNS(NS,'circle');dot.setAttribute('class','dot');
     const lab=document.createElementNS(NS,'text');lab.setAttribute('class','lab');lab.setAttribute('text-anchor','middle');
@@ -545,7 +561,7 @@ function buildMap(){const svg=document.getElementById('svg');svg.innerHTML='';
       if(isMobile()){showTip(e,sec);clearTimeout(window._tipTO);window._tipTO=setTimeout(hideTip,2600);}});});}
 function updateMap(){updateMapAt(S.pos);}
 function updateMapAt(pos){const qf=S.qfilter,f=Math.floor(pos);
-  DATA.sectors.forEach(sec=>{const n=nodes[sec.sector];if(!n)return;
+  curSectors().forEach(sec=>{const n=nodes[sec.sector];if(!n)return;
     const m=metricsAt(sec,pos),X=sx(m.x),Y=sy(m.y),r=rad(m.sz),c=col(m.x),q=quad(m.x,m.y);
     const vis=!S.hidden.has(sec.sector)&&(!S.search||sec.sector.includes(S.search))&&(!qf||q===qf);
     n.g.style.display=vis?'':'none';
@@ -567,7 +583,7 @@ function updateMapAt(pos){const qf=S.qfilter,f=Math.floor(pos);
     n.g.classList.toggle('dim',S.pinned.size>0&&!S.pinned.has(sec.sector));});}
 
 /* ===== summary / sidebar ===== */
-function snapshot(i){return DATA.sectors.map(sec=>{const m=metrics(sec,i);return{sector:sec.sector,...m,q:quad(m.x,m.y)};});}
+function snapshot(i){return curSectors().map(sec=>{const m=metrics(sec,i);return{sector:sec.sector,...m,q:quad(m.x,m.y)};});}
 function updateSummary(){const i=S.cur,snap=snapshot(i).filter(s=>!S.hidden.has(s.sector)).sort((a,b)=>b.x-a.x);
   document.getElementById('curDate').textContent=fmtDate(DATA.dates[i]);
   document.getElementById('sBuy').textContent=snap.length?`${snap[0].sector} ${fmt(snap[0].x)}億`:'—';
@@ -576,9 +592,25 @@ function updateSummary(){const i=S.cur,snap=snapshot(i).filter(s=>!S.hidden.has(
   document.getElementById('sOut').textContent=snap.filter(s=>s.x<0).length;
   const c={chao:0,lun:0,guan:0,tui:0};snap.forEach(s=>c[s.q]++);
   // 依圖上實際方位排：左上觀望／右上漲潮／左下退潮／右下輪動
-  const defs=[['guan','觀望','左上','流出趨緩'],['chao','漲潮⭐','右上','加速流入'],['tui','退潮','左下','流出加速'],['lun','輪動','右下','流入但放緩']];
-  document.getElementById('qmap').innerHTML='<div class="caphint">四象限（位置對應圖上·點選篩選）</div>'+defs.map(([k,t,ori,dd])=>
-    `<div class="qcell ${k} ${S.qfilter===k?'active':''}" onclick="filterQuad('${k}')"><span class="ori">${ori}</span><div class="t">${t}</div><div class="n">${c[k]}</div><div class="d">${dd}</div></div>`).join('');}
+  const defs=[['chao','漲潮⭐','右上','加速流入'],['lun','輪動','右下','流入但放緩'],['tui','退潮','左下','流出加速'],['guan','觀望','左上','流出趨緩']];
+  document.getElementById('qmap').innerHTML='<div class="qcells"><span class="caphint">四象限<br>點一下篩選</span>'+defs.map(([k,t,ori,dd])=>
+    `<div class="qcell ${k} ${S.qfilter===k?'active':''}" onclick="filterQuad('${k}')"><span class="ori">${ori}</span><div class="t">${t}</div><div class="n">${c[k]}</div><div class="d">${dd}</div></div>`).join('')+'</div>';
+  alignQuadBar();}
+/* 把四象限「按鈕」水平對齊圖表的垂直零線（X=0，即 Y 軸）。零線位置會隨資料/範圍/K線寬度變動，
+   用 SVG 內建 getScreenCTM() 精準換算（含 viewBox 縮放與 meet 置中留白）。說明小字隨群組移動但不算進對齊中心。 */
+function alignQuadBar(){var svg=document.getElementById('svg'),qmap=document.getElementById('qmap'),cells=qmap&&qmap.querySelector('.qcells');
+  if(!cells)return;
+  if(isMobile()||S.tab!=='map'||!svg||!svg.getScreenCTM){cells.style.transform='';return;}
+  var ctm=svg.getScreenCTM();if(!ctm){cells.style.transform='';return;}
+  var pt=svg.createSVGPoint();pt.x=sx(0);pt.y=0;var zeroX=pt.matrixTransform(ctm).x;
+  cells.style.transform='';                              // 先還原再量按鈕自然中心
+  var btns=cells.querySelectorAll('.qcell');if(!btns.length)return;
+  var f=btns[0].getBoundingClientRect(),l=btns[btns.length-1].getBoundingClientRect();
+  var off=zeroX-(f.left+l.right)/2;                      // 只讓「按鈕」中心對齊零線
+  var qr=qmap.getBoundingClientRect(),cr=cells.getBoundingClientRect();   // 夾住整組不超出
+  var minOff=(qr.left+8)-cr.left,maxOff=(qr.right-8)-cr.right;
+  off=(minOff>maxOff)?0:Math.max(minOff,Math.min(maxOff,off));
+  cells.style.transform='translateX('+off.toFixed(1)+'px)';}
 
 /* ===== tooltip ===== */
 function showTip(e,sec){const i=S.cur,m=metrics(sec,i),q=quad(m.x,m.y);
@@ -590,7 +622,8 @@ function showTip(e,sec){const i=S.cur,m=metrics(sec,i),q=quad(m.x,m.y);
    <div class="l"><span>動能(力道變化)</span><span style="color:${m.y>=0?'var(--in)':'var(--out)'}">${fmt(m.y)} 億/天</span></div>
    ${S.norm?`<div class="l"><span>相對強度</span><span>${fmt(m.x/sigma(sec))} σ</span></div>`:''}
    <div class="l"><span>象限</span><span>${QNAME[q]}（${QORI[q]}）</span></div>
-   <div class="l" style="color:var(--accent)"><span>點擊</span><span>${S.pinned.has(sec.sector)?'取消K線':'加入K線'}</span></div>`;
+   ${sec.note?`<div class="l" style="color:#caa84a;font-size:.92em"><span>⚠️ 注意</span><span style="max-width:170px;text-align:right">${sec.note}</span></div>`:''}
+   <div class="l" style="color:var(--accent)"><span>點擊</span><span>${S.pinned.has(sec.sector)?'取消K線':(sec.dim==='ai'?'看成員K線':'加入K線')}</span></div>`;
   let x=e.clientX-wrap.left+14,y=e.clientY-wrap.top+14;
   if(x>wrap.width-180)x-=195;if(y>wrap.height-130)y-=140;
   tip.style.left=x+'px';tip.style.top=y+'px';}
@@ -605,32 +638,72 @@ function togglePin(sec){if(S.pinned.has(sec))S.pinned.delete(sec);else S.pinned.
 function unpin(sec){S.pinned.delete(sec);renderKside();updateMap();renderPick();}
 function pinAll(on){if(!on)S.pinned.clear();renderKside();updateMap();renderPick();}
 function setKmode(sec,m){S.kmode[sec]=m;renderKside();}
+/* 目前 K 面板要畫的卡片清單：
+   - 證交所產業：每個釘選板塊一張（龍頭股 K 線 / 類股指數）。
+   - AI 主題：每個釘選主題「展開成它的成員個股」，各成員一張 K 線（呼應 ADR-0006）。 */
+let KLIST=[];
+function kitems(){const out=[];
+  if(S.showIndex&&DATA.market&&DATA.market.ohlc){               // 大盤基準卡固定置頂
+    out.push({sector:DATA.market.name||'加權指數',_key:'__mkt__',_theme:'__mkt__',
+      ohlc:DATA.market.ohlc,flow:DATA.market.flow,_ai:true,_index:true});}
+  curSectors().filter(s=>S.pinned.has(s.sector)).forEach(s=>{
+    if(s.dim==='ai'){(s.members||[]).forEach(mb=>out.push(
+      {sector:s.sector+' · '+mb.name,_key:s.sector+'/'+mb.id,_theme:s.sector,ohlc:mb.ohlc,flow:mb.flow,idx:null,_ai:true}));}
+    else out.push(Object.assign({},s,{_key:s.sector,_theme:s.sector}));});
+  return out;}
 function renderKside(){
-  const box=document.getElementById('kscroll');kref={};
-  if(S.pinned.size===0){box.innerHTML='<div class="kempty">尚未選擇板塊<br>點圖中泡泡，或按上方「＋ 選擇板塊」<br>即可在此看該產業 K 線</div>';return;}
-  // keep DATA order
-  const list=DATA.sectors.filter(s=>S.pinned.has(s.sector));
-  box.innerHTML=list.map(s=>kcardHtml(s)).join('');
-  list.forEach(s=>{kref[s.sector]={cursor:document.getElementById('kcur-'+cssId(s.sector)),
-    n:0,bw:0,ws:winStart()};drawKChart(s);});
+  const box=document.getElementById('kscroll');kref={};KLIST=kitems();
+  if(KLIST.length===0){box.innerHTML='<div class="kempty">尚未選擇'+(S.dim==='ai'?'主題':'板塊')+'<br>點圖中泡泡，或按上方「＋ 選擇」<br>'+(S.dim==='ai'?'即可在此看該主題的成員個股 K 線':'即可在此看該產業 K 線')+'</div>';return;}
+  box.innerHTML=KLIST.map(s=>kcardHtml(s)).join('');
+  KLIST.forEach(s=>drawKChart(s));
   updateCursors(S.pos);updateKvals(S.cur);}
-function cssId(s){return SECID[typeof s==='string'?s:(s&&s.sector)];}
-function kcardHtml(s){const id=cssId(s);const mode=S.kmode[s.sector]||'k';const rep=s.rep?s.rep.name:'';
-  return `<div class="kcard" data-s="${s.sector}">
+function kidHash(str){let h=0;for(let i=0;i<str.length;i++)h=(h*31+str.charCodeAt(i))|0;return 'k'+(h>>>0).toString(36);}
+function cssId(s){const k=(typeof s==='string')?s:(s&&(s._key||s.sector));return (SECID[k]!=null)?SECID[k]:kidHash(k);}
+function kcardHtml(s){const id=cssId(s);const mode=s._ai?'k':(S.kmode[s._key]||'k');
+  const rep=(!s._ai&&s.rep&&s.rep.name)?' · '+s.rep.name:'';
+  return `<div class="kcard" data-s="${s._key}">
     <div class="khead">
-      <span class="knm">${s.sector}${rep?' · '+rep:''}</span>
-      <button class="kpin" title="移除" onclick="unpin('${s.sector}')">✕</button>
+      <span class="knm">${s._index?'📊 ':''}${s.sector}${rep}</span>
+      <button class="kpin" title="${s._index?'隱藏大盤':'移除'}" onclick="${s._index?'toggleIndex()':`unpin('${s._theme}')`}">✕</button>
     </div>
     <div class="ksub">
       <span class="kval" id="kval-${id}"></span>
-      <span class="ktoggle"><button class="${mode==='k'?'on':''}" onclick="setKmode('${s.sector}','k')">個股</button><button class="${mode==='i'?'on':''}" onclick="setKmode('${s.sector}','i')">指數</button></span>
+      ${s._ai?'':`<span class="ktoggle"><button class="${mode==='k'?'on':''}" onclick="setKmode('${s._key}','k')">個股</button><button class="${mode==='i'?'on':''}" onclick="setKmode('${s._key}','i')">指數</button></span>`}
     </div>
-    <svg class="kchart" id="kc-${id}" viewBox="0 0 300 120" preserveAspectRatio="none"></svg>
+    <svg class="kchart${s._ai?' kchart-ai':''}" id="kc-${id}" viewBox="0 0 300 ${s._ai?178:120}" preserveAspectRatio="none"></svg>
   </div>`;}
-function drawKChart(s){const id=cssId(s),svg=document.getElementById('kc-'+id);if(!svg)return;
-  const ws=winStart(),we=LAST(),n=we-ws+1,mode=S.kmode[s.sector]||'k';
+/* AI 成員卡：上＝個股 K 線（價格），下＝法人資金流（每日淨買長條 + 區間累計線），共用同一時間軸游標。 */
+function drawMemberChart(s){const id=cssId(s),svg=document.getElementById('kc-'+id);if(!svg)return;
+  const ws=winStart(),we=LAST(),n=we-ws+1,VW=300,padR=4,bw=(VW-padR)/n;
+  kref[id]={cursor:null,n,bw,ws};let g='';
+  // ---- 價格區（上）----
+  const pT=8,pH=92,ohW=[];for(let i=ws;i<=we;i++)ohW.push(s.ohlc[i]);
+  const hv=ohW.filter(Boolean);
+  if(hv.length){const hi=Math.max(...hv.map(v=>v[1])),lo=Math.min(...hv.map(v=>v[2])),sp=(hi-lo)||1,Y=v=>pT+(1-(v-lo)/sp)*pH;
+    ohW.forEach((v,k)=>{if(!v)return;const cx=(k+0.5)*bw,up=v[3]>=v[0],c=upcol(up),w=Math.max(1.2,bw*0.6);
+      g+=`<line x1="${cx.toFixed(1)}" y1="${Y(v[1]).toFixed(1)}" x2="${cx.toFixed(1)}" y2="${Y(v[2]).toFixed(1)}" stroke="${c}" stroke-width="1"/>`;
+      const yo=Y(v[0]),yc=Y(v[3]),top=Math.min(yo,yc),hh=Math.max(1,Math.abs(yc-yo));
+      g+=`<rect x="${(cx-w/2).toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${hh.toFixed(1)}" fill="${c}"/>`;});
+    g+=`<text class="kaxis" x="2" y="${pT+4}">${hi.toFixed(hi<50?2:0)}</text><text class="kaxis" x="2" y="${pT+pH}">${lo.toFixed(lo<50?2:0)}</text>`;
+  } else g+=`<text class="kaxis" x="8" y="${pT+40}">無價格資料</text>`;
+  // ---- 資金流區（下）：每日淨買長條 + 區間累計線 ----
+  const fT=116,fH=46,fl=[];for(let i=ws;i<=we;i++)fl.push((s.flow&&s.flow[i]!=null)?s.flow[i]:0);
+  const maxAbs=Math.max(1,...fl.map(v=>Math.abs(v))),zeroY=fT+fH/2;
+  g+=`<line x1="0" y1="${zeroY.toFixed(1)}" x2="${VW}" y2="${zeroY.toFixed(1)}" stroke="#3a4a40" stroke-width="0.6"/>`;
+  fl.forEach((v,k)=>{const cx=(k+0.5)*bw,h=(v/maxAbs)*(fH/2-2),c=upcol(v>=0),w=Math.max(1,bw*0.5);
+    g+=`<rect x="${(cx-w/2).toFixed(1)}" y="${(v>=0?zeroY-h:zeroY).toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(0.5,Math.abs(h)).toFixed(1)}" fill="${c}" fill-opacity="0.5"/>`;});
+  let cum=0;const cumv=fl.map(v=>cum+=v),cmin=Math.min(0,...cumv),cmax=Math.max(0,...cumv),csp=(cmax-cmin)||1,CY=v=>fT+(1-(v-cmin)/csp)*fH;
+  g+=`<polyline points="${cumv.map((v,k)=>((k+0.5)*bw).toFixed(1)+','+CY(v).toFixed(1)).join(' ')}" fill="none" stroke="#caa84a" stroke-width="1.5"/>`;
+  g+=`<text class="kaxis" x="2" y="${fT+7}">${s._index?'三大法人(億)':'法人(億)'}</text>`;
+  g+=`<text class="kaxis" x="${VW-2}" y="${fT+7}" text-anchor="end" fill="#caa84a">區間累計 ${fmt(cumv[cumv.length-1])}億</text>`;
+  [0,Math.floor(n/2),n-1].forEach(k=>{const x=(k+0.5)*bw;g+=`<text class="kaxis" x="${x.toFixed(1)}" y="176" text-anchor="middle">${mmdd(DATA.dates[ws+k])}</text>`;});
+  g+=`<line id="kcur-${id}" class="kcursor" x1="0" y1="${pT}" x2="0" y2="${fT+fH}"/>`;
+  svg.innerHTML=g;kref[id].cursor=document.getElementById('kcur-'+id);}
+function drawKChart(s){if(s._ai&&s.flow)return drawMemberChart(s);
+  const id=cssId(s),svg=document.getElementById('kc-'+id);if(!svg)return;
+  const ws=winStart(),we=LAST(),n=we-ws+1,mode=s._ai?'k':(S.kmode[s._key]||'k');
   const VW=300,VH=120,padT=8,padB=14,padR=4,chH=VH-padT-padB;
-  let g='';let bw=(VW-padR)/n;kref[s.sector]={cursor:null,n,bw,ws};
+  let g='';let bw=(VW-padR)/n;kref[id]={cursor:null,n,bw,ws};
   if(mode==='k'&&s.ohlc){
     const win=[];for(let i=ws;i<=we;i++)win.push(s.ohlc[i]);
     const hi=Math.max(...win.filter(Boolean).map(v=>v[1])),lo=Math.min(...win.filter(Boolean).map(v=>v[2]));
@@ -655,15 +728,16 @@ function drawKChart(s){const id=cssId(s),svg=document.getElementById('kc-'+id);i
   // cursor line (updated live)
   g+=`<line id="kcur-${id}" class="kcursor" x1="0" y1="${padT}" x2="0" y2="${padT+chH}"/>`;
   svg.innerHTML=g;
-  kref[s.sector].cursor=document.getElementById('kcur-'+id);}
+  kref[id].cursor=document.getElementById('kcur-'+id);}
 function updateCursors(pos){const ws=winStart();
   Object.keys(kref).forEach(sec=>{const r=kref[sec];if(!r||!r.cursor)return;
     const pw=Math.max(0,Math.min(r.n-1,pos-ws));const x=((pw+0.5)*r.bw).toFixed(1);
     r.cursor.setAttribute('x1',x);r.cursor.setAttribute('x2',x);});}
-function updateKvals(i){DATA.sectors.forEach(s=>{if(!S.pinned.has(s.sector))return;const id=cssId(s.sector);
-  const el=document.getElementById('kval-'+id);if(!el)return;const mode=S.kmode[s.sector]||'k';
+function updateKvals(i){KLIST.forEach(s=>{const id=cssId(s);
+  const el=document.getElementById('kval-'+id);if(!el)return;const mode=s._ai?'k':(S.kmode[s._key]||'k');
   if(mode==='k'&&s.ohlc){const v=s.ohlc[i];if(v){const prev=lastClose(s.ohlc,i-1);const up=prev!=null?v[3]>=prev:v[3]>=v[0];
-      const pct=prev?((v[3]-prev)/prev*100):0;el.textContent=`${v[3]} (${pct>=0?'+':''}${pct.toFixed(1)}%)`;el.style.color=upcol(up);}else el.textContent='—';}
+      const pct=prev?((v[3]-prev)/prev*100):0;const fl=(s._ai&&s.flow&&s.flow[i]!=null)?`　法人 ${fmt(s.flow[i])}億`:'';
+      el.innerHTML=`${v[3]} (${pct>=0?'+':''}${pct.toFixed(1)}%)<span style="color:#caa84a">${fl}</span>`;el.style.color=upcol(up);}else el.textContent='—';}
   else{const c=s.idx[i],prev=lastIdx(s.idx,i-1);if(c!=null){const up=prev!=null?c>=prev:true;const pct=prev?((c-prev)/prev*100):0;
       el.textContent=`${c.toFixed(0)} (${pct>=0?'+':''}${pct.toFixed(1)}%)`;el.style.color=upcol(up);}else el.textContent='—';}});}
 function lastClose(a,i){for(let j=i;j>=0;j--)if(a[j])return a[j][3];return null;}
@@ -691,11 +765,11 @@ function setSpeed(s){S.spd=s;document.querySelectorAll('.speed button').forEach(
 function setRange(r){S.range=r;document.querySelectorAll('#rangeSel button').forEach(b=>b.classList.toggle('on',+b.dataset.r===r));
   const ws=winStart(),sc=document.getElementById('scrub');sc.min=ws;sc.max=LAST();
   document.getElementById('tlStart').textContent=mmdd(DATA.dates[ws]);document.getElementById('tlEnd').textContent=mmdd(DATA.dates[LAST()]);
-  renderKside();if(S.tab==='heat')renderHeat();setPos(LAST());}
+  renderKside();if(S.tab==='heat')renderHeat();setPos(LAST());alignQuadBar();}
 
 /* ===== heatmap (within window) ===== */
 function renderHeat(){const ws=winStart(),we=LAST();const dts=DATA.dates.slice(ws,we+1);
-  const secs=[...DATA.sectors].filter(s=>!S.hidden.has(s.sector)).sort((a,b)=>cum20(b.series,we)-cum20(a.series,we));
+  const secs=curSectors().filter(s=>!S.hidden.has(s.sector)).sort((a,b)=>cum20(b.series,we)-cum20(a.series,we));
   let cap=1;secs.forEach(s=>{for(let i=ws;i<=we;i++)cap=Math.max(cap,Math.abs(s.series[i]));});cap=Math.min(cap,300);
   function cell(v){const t=Math.max(-1,Math.min(1,v/cap)),inflow=t>=0,red=(S.color==='tw')?inflow:!inflow,a=Math.abs(t);
     if(a<0.02)return'background:#1a261f';return`background:${red?`rgba(224,106,60,${0.15+a*0.85})`:`rgba(39,169,120,${0.15+a*0.85})`}`;}
@@ -731,20 +805,41 @@ function switchTab(t){S.tab=t;
   const hints={map:'點泡泡可釘選到右側K線；按 ▶ 播放、或 ⏮⏭（←→鍵）逐日切換看輪動',
     heat:'每格＝該板塊單日法人淨買超，紅＝流入綠＝流出；依區間累計排序',rank:'拖時間軸看任一天排名；點列加入/移除K線'};
   document.getElementById('hint').textContent=hints[t];
-  if(t==='heat')renderHeat();if(t==='rank')renderRank();}
+  if(t==='heat')renderHeat();if(t==='rank')renderRank();alignQuadBar();}
 function setColor(c){S.color=c;document.getElementById('cTW').classList.toggle('on',c==='tw');document.getElementById('cUS').classList.toggle('on',c==='us');
   updateMap();updateSummary();renderKside();if(S.tab==='heat')renderHeat();if(S.tab==='rank')renderRank();}
 function setNorm(on){S.norm=!!on;
   document.querySelectorAll('#normSel button').forEach(b=>b.classList.toggle('on',(+b.dataset.n===1)===S.norm));
-  computeDomain();buildMap();setPos(S.pos);if(S.tab==='rank')renderRank();}
+  computeDomain();buildMap();setPos(S.pos);if(S.tab==='rank')renderRank();alignQuadBar();}
+/* 若當前維度尚無任何釘選，預設釘選近20日資金量前三大（讓切換後不會空白） */
+function autoPinTop3(){const cur=curSectors();if(cur.some(s=>S.pinned.has(s.sector)))return;
+  [...cur].sort((a,b)=>Math.abs(cum20(b.series,LAST()))-Math.abs(cum20(a.series,LAST()))).slice(0,3).forEach(s=>S.pinned.add(s.sector));}
+function setDim(d){S.dim=d;S.qfilter=null;
+  document.querySelectorAll('#dimSel button').forEach(b=>b.classList.toggle('on',b.dataset.d===S.dim));
+  autoPinTop3();updateKsideText();
+  computeDomain();buildMap();renderToggles();
+  setPos(S.pos);updateSummary();renderKside();
+  if(S.tab==='heat')renderHeat();if(S.tab==='rank')renderRank();}
+/* 右側 K 面板的標題與說明隨維度切換（產業＝龍頭股/指數；AI＝成員個股 K 線＋資金流疊加） */
+function toggleIndex(){S.showIndex=!S.showIndex;updateKsideText();renderKside();saveState();}
+function updateKsideText(){var t=document.getElementById('ksideTitle'),d=document.getElementById('ksideDesc');if(!t||!d)return;
+  var idxBtn=(typeof DATA!=='undefined'&&DATA&&DATA.market)?'<button class="addbtn idxbtn'+(S.showIndex?' on':'')+'" onclick="toggleIndex()" title="顯示/隱藏 加權指數(大盤) 基準：指數K線＋全市場三大法人買賣超">加權指數</button> ':'';
+  var pick='<button class="addbtn" onclick="openModal(\'mPick\')">＋ 選擇'+(S.dim==='ai'?'主題':'板塊')+'</button>';
+  if(S.dim==='ai'){
+    t.innerHTML='📈 AI 主題 · 成員 K 線 '+idxBtn+pick;
+    d.innerHTML='點 AI 主題泡泡，這裡列出該組<b>成員個股</b>。每張卡上方是<b>股價 K 線</b>、下方疊加<b>法人資金流</b>（紅/綠＝每日淨買長條、金線＝區間累計），對照「籌碼 vs 價格」，拖時間軸會一起動。';
+  } else {
+    t.innerHTML='📈 產業 K 線 '+idxBtn+pick;
+    d.innerHTML='看資金流入的板塊「價格表現如何」。每張卡可切換兩種視角：<br><b>個股</b>＝該板塊<b>龍頭股</b>（這段期間<b>成交金額最大</b>的個股）的日 K 棒；<br><b>指數</b>＝該板塊<b>類股指數</b>的走勢線。漲跌顏色依你的設定。';
+  }}
 function setFont(f){document.documentElement.style.setProperty('--fs',f);document.getElementById('fN').classList.toggle('on',f===1);document.getElementById('fB').classList.toggle('on',f!==1);}
 function setTrail(t){S.trail=t;document.querySelectorAll('#trailOpt button').forEach(b=>b.classList.toggle('on',+b.dataset.t===t));updateMap();}
 function setLabels(on){S.labels=on;const a=document.getElementById('lbOn'),b=document.getElementById('lbOff');if(a)a.classList.toggle('on',on);if(b)b.classList.toggle('on',!on);updateMap();}
-function renderToggles(){document.getElementById('toggleList').innerHTML=DATA.sectors.map(s=>
+function renderToggles(){document.getElementById('toggleList').innerHTML=curSectors().map(s=>
   `<label><input type="checkbox" ${S.hidden.has(s.sector)?'':'checked'} onchange="toggleSec('${s.sector}',this.checked)">${s.sector}</label>`).join('');}
 function toggleSec(name,on){if(on)S.hidden.delete(name);else S.hidden.add(name);updateMap();updateSummary();if(S.tab==='heat')renderHeat();if(S.tab==='rank')renderRank();}
-function setAllSec(on){if(on)S.hidden.clear();else DATA.sectors.forEach(s=>S.hidden.add(s.sector));renderToggles();updateMap();updateSummary();if(S.tab==='heat')renderHeat();if(S.tab==='rank')renderRank();}
-function renderPick(){document.getElementById('pickList').innerHTML=DATA.sectors.map(s=>
+function setAllSec(on){if(on)S.hidden.clear();else curSectors().forEach(s=>S.hidden.add(s.sector));renderToggles();updateMap();updateSummary();if(S.tab==='heat')renderHeat();if(S.tab==='rank')renderRank();}
+function renderPick(){document.getElementById('pickList').innerHTML=curSectors().map(s=>
   `<label><input type="checkbox" ${S.pinned.has(s.sector)?'checked':''} onchange="pickSec('${s.sector}',this.checked)">${s.sector}</label>`).join('');}
 function pickSec(name,on){if(on)S.pinned.add(name);else S.pinned.delete(name);renderKside();updateMap();}
 function openModal(id){if(id==='mPick')renderPick();document.getElementById(id).classList.add('show');}
@@ -752,23 +847,43 @@ function closeModal(id){document.getElementById(id).classList.remove('show');}
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('show');}));
 
 /* ===== persistence (記住使用者的釘選與設定) ===== */
-function saveState(){try{localStorage.setItem('tide_state',JSON.stringify({color:S.color,range:S.range,trail:S.trail,norm:S.norm,kmode:S.kmode,pinned:[...S.pinned],hidden:[...S.hidden]}));}catch(e){}}
+function saveState(){try{localStorage.setItem('tide_state',JSON.stringify({color:S.color,range:S.range,trail:S.trail,norm:S.norm,dim:S.dim,ksideW:S.ksideW,showIndex:S.showIndex,kmode:S.kmode,pinned:[...S.pinned],hidden:[...S.hidden]}));}catch(e){}}
 function loadState(){try{var j=JSON.parse(localStorage.getItem('tide_state'));if(!j)return;
   if(j.color)S.color=j.color;if(j.range)S.range=j.range;
   if(typeof j.trail==='number')S.trail=j.trail;
   if(typeof j.norm==='boolean')S.norm=j.norm;
+  if(j.dim==='twse'||j.dim==='ai')S.dim=j.dim;
+  if(typeof j.ksideW==='number')S.ksideW=j.ksideW;
+  if(typeof j.showIndex==='boolean')S.showIndex=j.showIndex;
   if(j.kmode)S.kmode=j.kmode;
   if(Array.isArray(j.pinned))S.pinned=new Set(j.pinned);
   if(Array.isArray(j.hidden))S.hidden=new Set(j.hidden);}catch(e){}}
 
+/* ===== 可拖曳分隔線：調整 K 線區寬度（最小＝預設 320，最多放大兩倍 640）===== */
+function initSplitter(){
+  var sp=document.getElementById('splitter'),ks=document.getElementById('kside');if(!sp||!ks)return;
+  var MINW=320,MAXW=640,drag=false,sx0=0,w0=0;
+  function applyW(w){w=Math.max(MINW,Math.min(MAXW,Math.round(w)));ks.style.width=w+'px';S.ksideW=w;}
+  if(S.ksideW){applyW(S.ksideW);setDims();buildMap();updateMap();updateCursors(S.pos);}
+  sp.addEventListener('mousedown',function(e){drag=true;sx0=e.clientX;w0=ks.getBoundingClientRect().width;
+    sp.classList.add('drag');document.body.style.userSelect='none';e.preventDefault();});
+  window.addEventListener('mousemove',function(e){if(!drag)return;applyW(w0-(e.clientX-sx0));
+    setDims();updateMap();updateCursors(S.pos);alignQuadBar();});
+  window.addEventListener('mouseup',function(){if(!drag)return;drag=false;sp.classList.remove('drag');
+    document.body.style.userSelect='';buildMap();updateMap();updateCursors(S.pos);alignQuadBar();saveState();});
+}
 /* ===== init ===== */
 function init(){
   loadState();
   SECID={};DATA.sectors.forEach((s,i)=>{SECID[s.sector]=i;});
   setDims();
+  if(!DATA.sectors.some(s=>(s.dim||'twse')===S.dim))S.dim='twse';   // 舊 data.json 無 AI 維度時退回產業
+  const hasAI=DATA.sectors.some(s=>s.dim==='ai');
+  const dsel=document.getElementById('dimSel');if(dsel&&!hasAI)dsel.style.display='none';  // 無 AI 資料則隱藏切換器
+  document.querySelectorAll('#dimSel button').forEach(b=>b.classList.toggle('on',b.dataset.d===S.dim));
+  updateKsideText();
   computeDomain();buildMap();
-  // 僅在沒有已儲存的釘選時，預設釘選近20日資金量前三大
-  if(S.pinned.size===0)[...DATA.sectors].sort((a,b)=>Math.abs(cum20(b.series,LAST()))-Math.abs(cum20(a.series,LAST()))).slice(0,3).forEach(s=>S.pinned.add(s.sector));
+  autoPinTop3();   // 當前維度若無釘選，預設前三大（dim-aware）
   renderToggles();
   document.getElementById('searchIn').addEventListener('input',e=>{S.search=e.target.value.trim();updateMap();});
   document.addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test((e.target&&e.target.tagName)||''))return;
@@ -779,11 +894,12 @@ function init(){
   setColor(S.color);setTrail(S.trail);setLabels(true);      // 還原設定並同步按鈕狀態（標籤固定顯示）
   setRange(S.range);                                        // 設定時間軸範圍並繪製
   setNorm(S.norm);                                          // 還原座標尺度並同步按鈕
+  initSplitter();
   window.addEventListener('beforeunload',saveState);
   setInterval(saveState,2000);
   // 螢幕尺寸變更（含手機↔桌機切換、旋轉）時重新套用畫布尺寸與重繪
   var _rz;window.addEventListener('resize',function(){clearTimeout(_rz);_rz=setTimeout(function(){
-    var was=H;setDims();if(H!==was){buildMap();}updateMap();updateCursors(S.pos);},180);});
+    var was=H;setDims();if(H!==was){buildMap();}updateMap();updateCursors(S.pos);alignQuadBar();},180);});
 }
 // ⓘ 圖表說明：手機（無 hover）改成點一下展開、點外面收起
 document.addEventListener('click',function(e){
@@ -791,8 +907,14 @@ document.addEventListener('click',function(e){
   if(h.contains(e.target)){h.classList.toggle('open');}
   else h.classList.remove('open');
 });
-function updatedLabel(){var e=document.getElementById('updLbl');if(e&&DATA&&DATA.updated){var d=DATA.updated;e.textContent='資料：'+d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6,8);}}
-function applyData(d){DATA=d;SECID={};DATA.sectors.forEach(function(s,i){SECID[s.sector]=i;});computeDomain();buildMap();renderToggles();renderKside();setRange(S.range);updatedLabel();}
+function updatedLabel(){var e=document.getElementById('updLbl');if(e&&DATA&&DATA.updated){var d=DATA.updated;e.textContent='最新資料 '+d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6,8);}}
+function applyData(d){DATA=d;SECID={};DATA.sectors.forEach(function(s,i){SECID[s.sector]=i;});
+  if(!DATA.sectors.some(function(s){return (s.dim||'twse')===S.dim;}))S.dim='twse';
+  var hasAI=DATA.sectors.some(function(s){return s.dim==='ai';}),dsel=document.getElementById('dimSel');
+  if(dsel)dsel.style.display=hasAI?'':'none';
+  document.querySelectorAll('#dimSel button').forEach(function(b){b.classList.toggle('on',b.dataset.d===S.dim);});
+  updateKsideText();
+  computeDomain();buildMap();autoPinTop3();renderToggles();renderKside();setRange(S.range);updatedLabel();}
 function boot(){fetch('data.json',{cache:'no-store'}).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(d){DATA=d;}).catch(function(){}).then(function(){init();updatedLabel();});}
 function reload(){var b=document.getElementById('refreshBtn');if(b)b.textContent='\u23f3';fetch('data.json',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){applyData(d);}).catch(function(){}).then(function(){if(b)b.textContent='\ud83d\udd04';});}
 boot();

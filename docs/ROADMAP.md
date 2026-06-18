@@ -27,6 +27,7 @@
 | # | 項目 | 紀錄 |
 |---|---|---|
 | AI主題 | 新增「AI 主題」可切換分群維度（10 子題+台積電獨立、點主題看成員 K 線、偏大個股備註）；資料管線新增上櫃資料源 | [ADR-0006](decisions/ADR-0006-ai-theme-dimension.md)、[ai-themes.md](ai-themes.md) |
+| 大盤/逆勢 | 加權指數基準卡（指數K線＋全市場法人）；大盤潮汐狀態；逆勢強勢高亮（退潮中相對強度排名前5） | [ADR-0007](decisions/ADR-0007-counter-tide-strength.md) |
 
 ## 待辦（方法論微調與健康度）
 

@@ -56,6 +56,16 @@ def fetch_mkt_netbuy(ds):
             if str(r[0]).strip().startswith("合計"):
                 return num(r[-1])
     return 0.0
+# 上櫃個股歷史 OHLC：櫃買官方端點僅回最新日（不開放歷史），改用 FinMind 公開資料 API（含上市/上櫃歷史）
+FINMIND_URL = "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id={sid}&start_date={s}&end_date={e}"
+def fetch_finmind_ohlc(sid, s, e):
+    """回傳 {YYYYMMDD: [o,h,l,c]}。"""
+    d = fetch(FINMIND_URL.format(sid=sid, s=s, e=e)); out={}
+    if d and d.get("status")==200:
+        for r in d.get("data",[]):
+            dt=str(r.get("date","")).replace("-","")
+            out[dt]=[num(r.get("open")),num(r.get("max")),num(r.get("min")),num(r.get("close"))]
+    return out
 
 # 上市產業別代碼（T86 selectType）
 SECTORS = {
@@ -229,7 +239,8 @@ def main():
     print("對應股票數:", len(stock_sector),
           "| 產業數:", len(set(stock_sector.values())), file=sys.stderr)
 
-    days = []                 # [{date, sv, ix, oh}]
+    days = []                 # [{date, sv, mv, ix, oh, mkt, otc_sh}]
+    otc_seen = set()          # 出現過的上櫃成員代號（之後用 FinMind 補歷史 OHLC）
     d = last
     guard = 0
     while len(days) < NDAYS and guard < NDAYS*3 + 40:
@@ -253,22 +264,31 @@ def main():
             sec=stock_sector.get(sid)
             if sec: sv[sec]=sv.get(sec,0)+val
             if sid in AI_MEMBERS: mv[sid]=val      # AI 主題成員(上市)的當日淨買金額
-        # 上櫃成員：股數×收盤=金額，OHLC 併入同一個 ohlc 表供成員 K 線使用
-        onv, ooh, onm = fetch_otc(ds, OTC_WANT)
+        # 上櫃成員：取「當日三大法人淨買股數」（官方）；股價(收盤)與 OHLC 稍後用 FinMind 補
+        onv, _ooh, onm = fetch_otc(ds, OTC_WANT)
         time.sleep(0.4)
         names_all.update(onm)
-        for sid, sh in onv.items():
-            c = ooh.get(sid,[0,0,0,0])[3]
-            mv[sid] = sh*c
-        for sid, v in ooh.items():
-            ohlc[sid] = v
+        otc_seen.update(onv.keys())
         mkt = fetch_mkt_netbuy(ds); time.sleep(0.3)   # 大盤三大法人合計買賣差額(元)
-        days.append({"date":ds,"sv":sv,"mv":mv,"ix":idx,"oh":ohlc,"mkt":mkt})
+        days.append({"date":ds,"sv":sv,"mv":mv,"ix":idx,"oh":ohlc,"mkt":mkt,"otc_sh":dict(onv)})
         names_all.update(names)
         print("  ok", ds, "累計", len(days), file=sys.stderr)
 
     days.sort(key=lambda x:x["date"])
     dates=[x["date"] for x in days]
+
+    # 上櫃成員：用 FinMind 補正確的每日 OHLC，並用「當日收盤」重算資金流金額（股數×當日收盤）
+    if otc_seen and dates:
+        s0=f"{dates[0][:4]}-{dates[0][4:6]}-{dates[0][6:8]}"
+        s1=f"{dates[-1][:4]}-{dates[-1][4:6]}-{dates[-1][6:8]}"
+        for sid in sorted(otc_seen):
+            fm=fetch_finmind_ohlc(sid, s0, s1); time.sleep(0.5)
+            print("  FinMind", sid, "天數", len(fm), file=sys.stderr)
+            for x in days:
+                oh=fm.get(x["date"])
+                if oh: x["oh"][sid]=oh
+                sh=x.get("otc_sh",{}).get(sid,0)
+                if sh: x["mv"][sid]=sh*(oh[3] if oh else 0)
 
     # 各股總成交金額 -> 選龍頭
     turn={}

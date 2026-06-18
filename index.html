@@ -69,7 +69,9 @@ button{font-family:inherit;cursor:pointer;color:inherit}
 .infohelp:hover,.infohelp:focus{border-color:var(--accent);outline:none}
 .infopop{position:absolute;top:135%;right:0;width:340px;max-width:78vw;background:rgba(7,15,11,.98);
   border:1px solid var(--line);border-radius:12px;padding:14px 15px;box-shadow:var(--shadow);z-index:30;
-  display:none;white-space:normal;color:var(--txt);font-size:13px;line-height:1.75;text-align:left;font-weight:400}
+  display:none;white-space:normal;color:var(--txt);font-size:13px;line-height:1.7;text-align:left;font-weight:400;max-height:74vh;overflow:auto}
+.infopop .sec{margin-top:9px;padding-top:8px;border-top:1px solid var(--line)}
+.infopop .sec b.h{color:var(--accent)}
 .infohelp:hover .infopop,.infohelp:focus .infopop,.infopop:hover,.infohelp.open .infopop{display:block}
 .infopop h5{margin:0 0 6px;font-size:13px;color:var(--accent);font-weight:700}
 .infopop b{color:#fff} .infopop .pos{color:var(--in);font-weight:700} .infopop .neg{color:var(--out);font-weight:700}
@@ -86,6 +88,13 @@ svg.chart{display:block;width:100%;height:100%}
 .bub text{transition:opacity .2s;pointer-events:none}
 .bub .lab{font-weight:700;fill:#fff} .bub .val{fill:rgba(255,255,255,.9)}
 .bub.dim{opacity:.2} .bub.pinned circle.dot{stroke:#fff;stroke-width:2.5}
+.bub.counter circle.dot{stroke:#ffd24a;stroke-width:3.4;filter:drop-shadow(0 0 5px rgba(255,210,74,.9))}
+.bub.counter text.lab{fill:#ffd24a;font-weight:800}
+.bub.counter.dim{opacity:.85}
+.ctrtog{display:inline-flex;align-items:center;gap:6px}
+.ctrtog .swst{font-size:.82em;font-weight:700;padding:1px 8px;border-radius:10px;background:var(--line);color:var(--muted2)}
+#counterBtn.on{border-color:#ffd24a;color:#ffd24a;font-weight:700}
+#counterBtn.on .swst{background:#ffd24a;color:#1a1a1a}
 
 .timeline{display:flex;align-items:center;gap:12px;padding:10px 18px;border-top:1px solid var(--line);background:var(--bg2)}
 .play{width:40px;height:40px;border-radius:50%;background:var(--accent);color:#062017;border:none;
@@ -214,6 +223,12 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
 .guide .qbox div{border:1px solid var(--line);border-radius:9px;padding:7px 9px;font-size:.84em;line-height:1.5}
 .guide .qbox b{display:block;margin-bottom:1px}
 .guide .note{background:rgba(58,208,160,.08);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--txt);font-size:.92em;margin:0 0 8px}
+.guide .gtoc{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px;padding-bottom:11px;border-bottom:1px solid var(--line)}
+.guide .gtoc button{background:var(--bg2);border:1px solid var(--line);border-radius:8px;color:var(--accent);font-size:.86em;padding:5px 11px;cursor:pointer}
+.guide .gtoc button:hover{border-color:var(--accent)}
+.guide .why{background:rgba(58,208,160,.05);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:9px 13px;margin:0 0 10px}
+.guide .why .q{color:var(--accent);font-weight:700;display:block;margin-bottom:3px}
+.guide .term{color:var(--muted2);font-size:.9em}
 
 @media(max-width:1100px){.kside{width:260px}}
 @media(max-width:900px) and (min-width:641px){.kside{width:230px}.sidebar{width:112px}}
@@ -292,6 +307,7 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
         <button data-n="0" class="on" onclick="setNorm(false)">金額(億)</button>
         <button data-n="1" onclick="setNorm(true)">相對強度</button>
       </div>
+      <button class="iconbtn ctrtog" id="counterBtn" onclick="toggleCounter()" title="逆勢強勢高亮：當「大盤潮汐」退潮（全市場法人在賣）時，把仍逆勢被買、且力道還在擴大、相對強度最強的前5個板塊用金色標出——幫你找退潮中最抗跌/最強勢的標的。漲潮日不會有高亮。">🌊 逆勢強勢 <span class="swst" id="counterSw">關</span></button>
       <div class="search">🔍<input id="searchIn" placeholder="搜尋板塊…"></div>
       <span id="updLbl" class="sub" style="align-self:center"></span>
       <button class="iconbtn" id="refreshBtn" title="重新整理資料" onclick="reload()">🔄</button>
@@ -300,7 +316,7 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
     </div>
   </div>
 
-  <div class="summary"><span class="chipline">📅 檢視日 <b id="curDate">—</b>　|　近5日買超王 <span class="pos" id="sBuy">—</span>　賣超王 <span class="neg" id="sSell">—</span>　|　淨流入 <b id="sIn">—</b> 板塊・淨流出 <b id="sOut">—</b> 板塊</span></div>
+  <div class="summary"><span class="chipline">📅 檢視日 <b id="curDate">—</b>　|　近5日買超王 <span class="pos" id="sBuy">—</span>　賣超王 <span class="neg" id="sSell">—</span>　|　淨流入 <b id="sIn">—</b> 板塊・淨流出 <b id="sOut">—</b> 板塊<span id="mktTideWrap">　|　🌊 大盤潮汐 <b id="mktTide">—</b></span></span></div>
 
   <div class="main">
     <div class="center">
@@ -313,16 +329,26 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
         <div class="cright">
           <span class="infohelp" tabindex="0">ⓘ 圖表說明<div class="infopop">
             <h5>怎麼看這張圖</h5>
-            <div style="margin-bottom:8px"><b>一句話</b>：橫軸看資金現在「<b>在哪</b>」（位置）、縱軸看力道「<b>正在怎麼變</b>」（動能）。兩軸同單位（億/天），<b>縱軸就是橫軸的變化</b>。</div>
-            <b>橫軸｜近5日日均淨買（億/天，平滑）</b>：<span class="pos">右＝資金流入</span>、<span class="neg">左＝流出</span>。先做指數加權平滑(EMA)再取5日均，故為<b>趨勢值</b>、能壓掉單日大單雜訊。<br>
-            <b>縱軸｜力道變化（本週日均 − 上週日均·億/天）</b>：<span class="pos">往上＝比上週更偏買</span>（買更多或賣更少）、<span class="neg">往下＝更偏賣</span>（買更少或賣更多）。這是力道的「變化」、<b>不是方向</b>。「加速／放緩」要<b>配合橫軸</b>看：右邊（在買）往上＝買盤加速、左邊（在賣）往下＝賣壓加速。<br>
-            <b>圈圈</b>：大小＝近20日資金量級、顏色＝近5日方向（兩個週期）。<br>
-            <br><b>四象限</b>（順時針輪動）<br>
-            ⭐ <b>漲潮</b>（右上）：流入且加速，最強<br>
-            <b>輪動</b>（右下）：仍在流入，但力道放緩<br>
-            <b>退潮</b>（左下）：流出加速，越流越多<br>
-            <b>觀望</b>（左上）：流出趨緩，可能回穩<br>
-            <span class="ex">例：某板塊前一週日均買 +15 億，這週降到 +10 億 → 仍是淨買（在右邊），但加速度 −5（在下面）＝「流入但放緩」。減速 ≠ 倒車。</span>
+            <div><b>一句話</b>：橫軸看資金「<b>在哪</b>」（位置）、縱軸看力道「<b>正在怎麼變</b>」（動能）。兩軸同單位（億/天），<b>縱軸就是橫軸的變化</b>。追蹤的是<b>三大法人</b>的資金流。</div>
+
+            <div class="sec"><b class="h">① 兩個軸</b><br>
+            <b>橫軸｜近5日日均淨買（億/天，平滑）</b>：<span class="pos">右＝流入</span>、<span class="neg">左＝流出</span>。先做指數加權平滑(EMA)再取5日均，是<b>趨勢值</b>、壓掉單日大單雜訊。<br>
+            <b>縱軸｜力道變化（本週日均 − 上週日均）</b>：<span class="pos">上＝比上週更偏買</span>、<span class="neg">下＝更偏賣</span>。是力道的<b>變化、不是方向</b>；「加速／放緩」要配合橫軸看。</div>
+
+            <div class="sec"><b class="h">② 圈圈</b>：大小＝近20日資金量級、顏色＝近5日方向（兩個不同週期）。</div>
+
+            <div class="sec"><b class="h">③ 四象限</b>（順時針輪動）<br>
+            ⭐<b>漲潮</b>（右上）流入且加速、最強｜<b>輪動</b>（右下）仍流入但放緩<br>
+            <b>退潮</b>（左下）流出加速、越流越多｜<b>觀望</b>（左上）流出趨緩、可能回穩<br>
+            <span class="ex" style="margin:6px 0 0;padding:0;border:0">例：前一週日均買 +15 億、這週降到 +10 億 → 仍淨買（在右邊）但加速度 −5（在下面）＝流入但放緩。減速 ≠ 倒車。</span></div>
+
+            <div class="sec"><b class="h">④ 兩種分群（右上切換）</b>：<b>證交所產業</b> ↔ <b>AI 主題</b>（10 個 AI 供應鏈子題＋台積電獨立）。點泡泡可釘到右側看 K 線；AI 主題點下去看<b>成員個股</b>的「股價 K 線＋法人資金流」對照。座標可切「金額」或「相對強度(÷自身波動)」。</div>
+
+            <div class="sec"><b class="h">⑤ 大盤潮汐 + 逆勢強勢</b>：摘要列顯示全市場法人是<span class="pos">漲潮（買）</span>還<span class="neg">退潮（賣）</span>。<b>大盤退潮時</b>，仍逆勢流入、且相對強度(÷自身波動)最強的<b>前 5 個</b>板塊會用<b style="color:#ffd24a">金色 🌊</b> 高亮——退潮中最強勢的標的。</div>
+
+            <div class="sec"><b class="h">⑥ K 線區（右側）</b>：看「價格 vs 籌碼」對照。「<b>加權指數</b>」鈕可叫出大盤基準卡；中間分隔線可拖曳調整寬度。下方時間軸可播放／逐日切換看輪動。</div>
+
+            <div class="sec" style="color:var(--muted2);font-size:.92em">※ 本工具為資金流<b>觀察</b>，非選股或買賣建議。</div>
           </div></span>
           <div class="hint" id="hint">點泡泡可釘選到右側K線；按 ▶ 播放、或 ⏮⏭（←→鍵）逐日切換看輪動</div>
         </div>
@@ -356,7 +382,7 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
           <button data-s="0.7" onclick="setSpeed(0.7)">快</button>
         </div>
       </div>
-      <div class="foot">資料：臺灣證券交易所 三大法人買賣超(T86)＋每日收盤行情 ｜ 僅供參考，不構成投資建議</div>
+      <div class="foot"><b id="verLbl" style="color:var(--accent)"></b>資料：臺灣證券交易所＋櫃買中心＋FinMind ｜ 僅供參考，不構成投資建議</div>
     </div>
 
     <div class="splitter" id="splitter" title="拖曳左右調整 K 線區寬度（最多放大兩倍）"></div>
@@ -373,51 +399,70 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
 <!-- 新手指南 -->
 <div class="modal" id="mGuide"><div class="box">
   <button class="x" onclick="closeModal('mGuide')">×</button>
-  <h3>📖 新手指南</h3>
+  <h3>📖 完整新手指南 · 設計筆記</h3>
   <div class="guide">
-    <h4>1. 這張圖在看什麼？</h4>
-    <p>它追蹤<b>三大法人（外資、投信、自營商）的資金</b>，正流向台股哪些<b>板塊</b>、又正從哪些板塊撤出，並把「<b>流入多寡</b>」與「<b>力道是加速還是放緩</b>」同時畫在一張圖上，幫你看出資金的<b>輪動</b>。</p>
+    <div class="gtoc">
+      <button onclick="gjump('gA')">① 一分鐘總覽</button>
+      <button onclick="gjump('gB')">② 設計故事（為什麼這樣做）</button>
+      <button onclick="gjump('gC')">③ 操作速查</button>
+      <button onclick="gjump('gD')">④ 資料來源與限制</button>
+    </div>
 
-    <h4>2. 兩個軸怎麼讀</h4>
-    <p class="note"><b>先記住一句話：橫軸看資金「在哪」（位置），縱軸看力道「正在怎麼變」（動能）。</b>兩軸都用同一個單位<b>億/天</b>，所以<b>縱軸其實就是橫軸的變化</b>——這也是為什麼橫軸用「<b>日均</b>」而非「5天總和」：要和縱軸對齊，兩個數字才好互相對照。</p>
-    <p><b>橫軸（左右）＝近5日「日均」淨買超（億/天，平滑趨勢值）。</b><span class="pos">越右＝法人每天平均買越多</span>，<span class="neg">越左＝賣越多</span>，中間是零（沒進沒出）。為了壓掉單日大單造成的假跳動，先對每日淨買做<b>指數加權平滑（EMA，近的日子權重高）</b>、再取5天平均——所以這個數字是<b>平滑後的趨勢值</b>，不是把原始5天加起來除以5的算術平均。看的是一段趨勢而非單點。</p>
-    <p><b>縱軸（上下）＝資金力道的「變化」（動能）。</b>往上＝比上週<b>更偏買方</b>（買更多、或賣更少），往下＝<b>更偏賣方</b>（買更少、或賣更多）。公式就是「本週日均淨買超 − 上週日均」（同樣以平滑後序列計算，故 Y 仍恰好是橫軸的變化）。⚠️ 這是<b>變化、不是方向</b>：一個板塊可以「還在買（在右邊）但力氣變小（往下掉）」。至於「加速／放緩」要<b>配合橫軸一起看</b>——右邊往上＝買盤加速、左邊往下＝賣壓加速；<b>減速 ≠ 倒車。</b></p>
+    <h4 id="gA">① 一分鐘總覽</h4>
+    <p>嗨，這是我自己做來「看資金往哪流」的觀察工具。它每天追蹤<b>三大法人</b><span class="term">（外資、投信、自營商這三類專業大戶。他們資金大、進出常被當成盤面的主力參考——白話說，就是「大戶今天買了什麼、賣了什麼」）</span>的錢，<b>流進</b>台股哪些地方、又<b>從哪裡撤</b>。</p>
+    <p class="note"><b>一句話心智模型：橫軸看資金「在哪」（位置），縱軸看力道「正在怎麼變」（動能）。</b>泡泡越往右＝越被買、越往左＝越被賣；越往上＝買的力道還在加強、越往下＝在減弱。把每天的位置連起來，就看得出資金在板塊之間「<b>輪動</b>」——錢從一群股票，慢慢轉到另一群。</p>
+    <p>先講最重要的一句：<b>這是「觀察」工具，不是明牌、也不是買賣訊號。</b>它幫我縮小研究範圍、提早看到苗頭；真正要不要買賣，還是得回到個股本身。</p>
 
-    <h4>3. 圈圈代表什麼</h4>
-    <p><b>大小</b>＝近20日累積資金量（越大＝中期進出的錢越多）。<b>顏色</b>＝近5日方向（<span class="pos">紅/橘＝流入</span>、<span class="neg">綠＝流出</span>，可在設定切換紅綠）。注意大小看20日、顏色看5日，是<b>兩個不同週期</b>。</p>
+    <h4 id="gB">② 設計故事：我為什麼這樣設計</h4>
+    <p>這一段是工具的靈魂。下面每個功能都不是隨便加的，而是為了回答一個問題、或解決一個會「騙到自己」的盲點。</p>
 
-    <h4>4. 四象限與順時針輪動</h4>
-    <div class="qbox">
-      <div><b style="color:var(--grey)">觀望（左上）</b>流出趨緩，可能落底回穩</div>
+    <div class="why"><span class="q">1. 我想解決什麼問題？</span>
+    我每天會看「<b>三大法人買賣超</b>」<span class="term">（法人當天淨買或淨賣了多少。買多於賣＝買超、反之＝賣超）</span>。但一長串數字、長條圖，我很難一眼看出「錢正從哪一群股票，輪到另一群」。所以我想做一張<b>會動的圖</b>，讓資金的流動看得見。</div>
+
+    <div class="why"><span class="q">2. 為什麼用「四象限」這個模型？</span>
+    我把每個板塊用兩個問題定位：<b>錢在哪</b>（橫軸：最近在被買還被賣）、<b>力道在怎麼變</b>（縱軸：買賣的勁道在變強還變弱）。這兩個一組合，就成了四個象限，而且資金通常會<b>順時針</b>繞一圈，像潮水的漲退：
+    <div class="qbox" style="margin-top:8px">
+      <div><b style="color:var(--grey)">觀望（左上）</b>還在流出，但賣壓變小，可能落底回穩</div>
       <div><b style="color:var(--in)">⭐ 漲潮（右上）</b>流入又加速，最強</div>
       <div><b style="color:var(--out)">退潮（左下）</b>流出又加速，最弱</div>
-      <div><b style="color:var(--neu)">輪動（右下）</b>還在流入但力道放緩</div>
+      <div><b style="color:var(--neu)">輪動（右下）</b>還在流入，但力道放緩</div>
     </div>
-    <p>健康的資金循環多是<b>順時針</b>：漲潮 → 輪動 → 退潮 → 觀望 → 再回漲潮。按 ▶ 播放、或拖時間軸，泡泡拖著的尾巴就是它最近走過的路徑。</p>
+    順時針：漲潮 → 輪動 → 退潮 → 觀望 → 再回漲潮。泡泡拖著的尾巴，就是它最近走過的路。</div>
 
-    <h4>5. 怎麼操作</h4>
+    <div class="why"><span class="q">3. 為什麼要費工「讓數字誠實」？</span>
+    原始數字很容易騙人，我做了三件事讓它不誤導自己：<br>
+    • <b>平滑（EMA）</b>：某天一筆大單就能讓數字暴衝。所以我先把每日淨買做「<b>指數加權平滑</b>」<span class="term">（近幾天權重高的一種平均，壓掉單日雜訊）</span>，看的是趨勢、不是單點。<br>
+    • <b>相對強度（÷自身波動）</b>：大型股（像半導體）的錢天生就大，會永遠被推到圖的外圍，看起來最強——但那是「盤子大」不是「真的在輪動」。所以提供一個切換，把每個板塊除以<b>它自己的波動度</b><span class="term">（σ，衡量它平常進出多大）</span>，放到同一把尺上公平比。<br>
+    • <b>X、Y 同單位</b>：兩軸都用「億/天」，這樣縱軸（力道變化）<b>剛好就是橫軸的變化量</b>，整張圖的邏輯才自洽、不打架。</div>
+
+    <div class="why"><span class="q">4. 為什麼多做一套「AI 主題」分類？</span>
+    證交所的官方產業分類（半導體、電子零組件…）對現在的 AI 行情<b>太粗</b>：散熱、CoWoS、CPO 這些 AI 子題被打散在不同產業裡，看不出它們之間的輪動。所以我自己定義了一組<b>AI 供應鏈主題</b>（右上可切換），用同一批個股資料、按主題重新分群。點一個主題，右側還會列出它的<b>成員個股</b>，把<b>股價 K 線</b><span class="term">（紅綠蠟燭，看漲跌）</span>和<b>法人資金流</b><span class="term">（籌碼，看大戶買賣）</span>疊在一起，讓我對照「價格」和「籌碼」是不是同步。</div>
+
+    <div class="why"><span class="q">5. 為什麼有「大盤潮汐」和「逆勢強勢」？</span>
+    這是我覺得最有價值的一塊。<b>大盤</b>（加權指數）的法人買賣超，像是整片海的<b>潮水</b>：漲潮＝法人在買整個市場、退潮＝在賣。多數股票會跟著潮水走。所以真正強的訊號不是「它在被買」，而是——<b>整片海退潮時，它逆勢還在被買、而且力道還在擴大</b>。我把這種板塊叫「逆勢強勢」，並且只挑其中<b>相對強度最強的前 5 個</b>用金色高亮<span class="term">（為什麼要排名？因為大盤總額被大型股主導，若只看「自己正、大盤負」會標出一堆只是「沒被賣」的板塊，不夠強；用相對強度排名才挑得出真正最強的）</span>。注意：只有<b>退潮時</b>才會高亮，漲潮日不會有。</div>
+
+    <div class="why"><span class="q">6. 我替自己立的原則</span>
+    這是個人研究／學習工具，我守三條：<b>只做觀察</b>（呈現資金在哪、怎麼流，不替你決定買賣）、<b>不誤導自己</b>（平滑、相對強度、誠實標註，都是為了這個）、<b>不做選股或買賣訊號</b>（只到群組/板塊層級的相對位置，不對個股給評分）。</div>
+
+    <h4 id="gC">③ 操作速查</h4>
     <ul>
-      <li><b>▶ 播放 / 拖時間軸</b>：看資金一天天怎麼移動。</li>
-      <li><b>⏮ 上一天 / ⏭ 下一天</b>（或鍵盤 ← →，空白鍵播放/暫停）：逐日定格細看每一天的變化。</li>
-      <li><b>點泡泡</b>：把該板塊釘到右側看 K 線，對照「資金」與「股價」。</li>
-      <li><b>點左側象限格</b>：只看該象限的板塊。</li>
-      <li><b>金額(億) ↔ 相對強度</b>（右上切換）：<b>金額</b>看真實資金量，直覺、貼近「實際幾億」；但大板塊（半導體等）盤子大，天生就被推到外圍，<b>不代表真在輪動</b>。<b>相對強度</b>用各板塊<b>自身波動</b>標準化，把大小板塊放到同一把尺上——<b>想公平比較「資金正輪動進誰」時，用這個才準。</b></li>
-      <li><b>搜尋 / 設定</b>：找特定板塊、改顏色與字級。</li>
+      <li><b>三個分頁</b>：<b>輪動軌跡</b>（主圖）、<b>資金熱力圖</b>（每天每板塊的買賣超色塊）、<b>排行榜</b>（當天排名）。</li>
+      <li><b>上方切換鈕</b>：時間範圍（20/40/60 日）、<b>證交所產業 ↔ AI 主題</b>、<b>金額 ↔ 相對強度</b>、<b>🌊 逆勢強勢</b> 高亮開關。</li>
+      <li><b>圖表上方四象限按鈕</b>：點一下＝只看該象限的板塊（再點一次取消）。</li>
+      <li><b>時間軸（下方）</b>：▶ 播放看資金一天天移動；⏮⏭ 或鍵盤 ← →、空白鍵 逐日／播放暫停；也可直接拖。</li>
+      <li><b>點泡泡</b>：釘到右側 K 線區對照；AI 主題模式點下去看<b>成員個股 K 線＋資金流</b>。</li>
+      <li><b>K 線區（右側）</b>：「<b>加權指數</b>」鈕叫出大盤基準卡；中間<b>分隔線可拖曳</b>調整寬度；「＋ 選擇」可手動加板塊/主題。</li>
+      <li><b>摘要列</b>：檢視日（你正在看的那天）、買/賣超王、<b>🌊 大盤潮汐</b>（當天大盤是漲潮或退潮）。</li>
+      <li><b>設定</b>：紅綠漲跌配色、字級大小。</li>
     </ul>
 
-    <h4>6. 怎麼用它做判斷（重要心態）</h4>
-    <div class="note">把這張圖當作<b>資金面儀表板</b>，不是<b>買賣訊號燈</b>。它幫你<b>縮小研究範圍</b>與<b>提早預警</b>，真正下單仍要回到個股基本面與股價。</div>
+    <h4 id="gD">④ 資料來源與限制</h4>
     <ul>
-      <li><b>找標的</b>：鎖定「漲潮、且資金量大、又配合類股指數同步走強」的板塊，再往下挑個股。</li>
-      <li><b>減碼預警</b>：手上持股的板塊若從<b>漲潮滑向輪動、甚至接近退潮</b>，列入檢視清單。</li>
-      <li><b>看量價</b>：用右側 K 線對照——資金流入但股價不漲，或資金流出股價硬撐，都是值得留意的背離。</li>
-    </ul>
-
-    <h4>7. 限制與提醒</h4>
-    <ul>
-      <li>法人買賣超是<b>公開、且落後一天</b>的資訊，部分已反映在當天股價，別把它當「先知」。</li>
-      <li>視窗只有 5 日 / 20 日，<b>容易被單一大單影響</b>，看趨勢別看單點。</li>
-      <li>資料來源：臺灣證券交易所 T86＋每日收盤行情。<b>僅供參考，不構成投資建議。</b></li>
+      <li><b>資料來源</b>：臺灣證券交易所（三大法人買賣超 T86、每日收盤、加權指數、法人合計 BFI82U）＋ 證券櫃檯買賣中心（上櫃個股）。每個交易日盤後<b>自動更新</b>。</li>
+      <li><b>會落後</b>：法人買賣超是<b>盤後、且落後一天</b>的公開資訊，部分已反映在當天股價，別把它當「先知」。</li>
+      <li><b>平滑有代價</b>：壓雜訊的同時會輕微「慢半拍」；視窗只有 5/20 日，看趨勢別看單點。</li>
+      <li><b>自訂分類是主觀的</b>：AI 主題的成員是人為判斷、會隨產業變化，當參考、別當標準答案。</li>
+      <li><b>純參考</b>：本工具為資金流觀察，<b>不構成投資建議</b>。</li>
     </ul>
   </div>
 </div></div>
@@ -469,8 +514,9 @@ function setDims(){
   var s=document.getElementById('svg');if(s)s.setAttribute('viewBox','0 0 '+W+' '+H);
 }
 const WIN=5,BASE=5,CUM=20,I0=WIN+BASE-1,EMA_SPAN=3;
+const APP_VER='v0.3.0',APP_DATE='2026-06-18';   // 版本資訊（顯示於頁尾）；發版時更新
 const S={tab:'map',color:'tw',trail:6,labels:true,search:'',hidden:new Set(),pinned:new Set(),
-  range:40, kmode:{}, cur:0,pos:0, playing:false,spd:1.4,raf:null,lastT:null, qfilter:null, norm:false, dim:'twse', ksideW:0, showIndex:false};
+  range:40, kmode:{}, cur:0,pos:0, playing:false,spd:1.4,raf:null,lastT:null, qfilter:null, norm:false, dim:'twse', ksideW:0, showIndex:false, counterHi:true};
 const QNAME={chao:'漲潮',lun:'輪動',guan:'觀望',tui:'退潮'};
 const QORI={chao:'右上',lun:'右下',guan:'左上',tui:'左下'};
 let SECID={};
@@ -499,6 +545,21 @@ function metricsAt(sec,pos){const last=LAST(),f=Math.min(last,Math.max(I0,Math.f
   const a=metrics(sec,f);if(r===0||f>=last)return mnorm(a,sec);const b=metrics(sec,f+1);
   return mnorm({x:a.x+(b.x-a.x)*r,y:a.y+(b.y-a.y)*r,sz:a.sz+(b.sz-a.sz)*r},sec);}
 function quad(x,y){if(x>=0&&y>=0)return'chao';if(x>=0)return'lun';if(y>=0)return'guan';return'tui';}
+/* 大盤潮汐：全市場三大法人近5日日均買賣超（億/天）。<0＝退潮（法人在賣大盤）。 */
+function marketRoll5(i){if(!DATA.market||!DATA.market.flow)return null;const f=DATA.market.flow;let a=0,c=0;
+  for(let j=Math.max(0,i-WIN+1);j<=i;j++){if(f[j]!=null){a+=f[j];c++;}}return c?a/c:0;}
+/* 逆勢強勢：大盤退潮(tide<0)，但這個板塊自己仍淨流入(x>0)且力道沒減速(y>=0)＝逆勢還在擴大。 */
+function isCounter(m,tide){return tide!=null&&tide<0&&m.x>0&&m.y>=0;}
+const COUNTER_TOPN=5;
+/* 退潮時，從所有「逆勢」候選中，只取相對強度(x/自身σ)最強的前 N 名 —— 消除大小偏誤、限制數量，
+   標出的才是「退潮中真正最強」的板塊。回傳板塊名稱陣列。 */
+function counterTops(pos){const f=Math.floor(pos),tide=marketRoll5(f);
+  if(!S.counterHi||tide==null||tide>=0)return [];
+  const cand=[];
+  curSectors().forEach(sec=>{if(S.hidden.has(sec.sector))return;const m=metricsAt(sec,pos);
+    if(isCounter(m,tide))cand.push({name:sec.sector,str:m.x/sigma(sec)});});
+  cand.sort((a,b)=>b.str-a.str);
+  return cand.slice(0,COUNTER_TOPN).map(c=>c.name);}
 
 /* ===== scales ===== */
 let LTX=5,LTY=1;
@@ -561,8 +622,10 @@ function buildMap(){const svg=document.getElementById('svg');svg.innerHTML='';
       if(isMobile()){showTip(e,sec);clearTimeout(window._tipTO);window._tipTO=setTimeout(hideTip,2600);}});});}
 function updateMap(){updateMapAt(S.pos);}
 function updateMapAt(pos){const qf=S.qfilter,f=Math.floor(pos);
+  const counterSet=new Set(counterTops(pos));
   curSectors().forEach(sec=>{const n=nodes[sec.sector];if(!n)return;
     const m=metricsAt(sec,pos),X=sx(m.x),Y=sy(m.y),r=rad(m.sz),c=col(m.x),q=quad(m.x,m.y);
+    const ctr=counterSet.has(sec.sector);
     const vis=!S.hidden.has(sec.sector)&&(!S.search||sec.sector.includes(S.search))&&(!qf||q===qf);
     n.g.style.display=vis?'':'none';
     if(S.trail>0){let pts=[];for(let j=Math.max(I0,f-S.trail);j<=f;j++){const mm=mnorm(metrics(sec,j),sec);pts.push(sx(mm.x).toFixed(1)+','+sy(mm.y).toFixed(1));}
@@ -571,15 +634,17 @@ function updateMapAt(pos){const qf=S.qfilter,f=Math.floor(pos);
     n.dot.setAttribute('cx',X);n.dot.setAttribute('cy',Y);n.dot.setAttribute('r',r);
     n.dot.setAttribute('fill',c.f);n.dot.setAttribute('fill-opacity','0.85');n.dot.setAttribute('stroke',c.s);n.dot.setAttribute('stroke-width','1.6');
     const star=(q==='chao'&&m.x>20)?' ⭐':'';
+    const cmk=ctr?' 🌊':'';
     const mob=isMobile();
-    // 手機為避免中央小板塊標籤重疊：只標示已釘選、明顯流入/流出、或泡泡較大者
-    const showLab=S.labels && (!mob || S.pinned.has(sec.sector) || Math.abs(m.x)>=15 || r>=34);
+    // 手機為避免中央小板塊標籤重疊：只標示已釘選、明顯流入/流出、或泡泡較大者（逆勢強勢一律標示）
+    const showLab=S.labels && (ctr || !mob || S.pinned.has(sec.sector) || Math.abs(m.x)>=15 || r>=34);
     n.lab.setAttribute('x',X);n.lab.setAttribute('y',mob?Y+r*0.32:Y-1);
     n.lab.setAttribute('font-size',mob?Math.max(21,r*0.5):Math.max(9,r*0.4));
-    n.lab.textContent=showLab?sec.sector+star:'';
+    n.lab.textContent=showLab?sec.sector+star+cmk:'';
     n.val.setAttribute('x',X);n.val.setAttribute('y',Y+r*0.46+4);n.val.setAttribute('font-size',Math.max(8,r*0.32));
     n.val.textContent=(S.labels&&!mob)?fmt(m.x):'';   // 手機改用點按看數值，減少擁擠
     n.g.classList.toggle('pinned',S.pinned.has(sec.sector));
+    n.g.classList.toggle('counter',ctr);
     n.g.classList.toggle('dim',S.pinned.size>0&&!S.pinned.has(sec.sector));});}
 
 /* ===== summary / sidebar ===== */
@@ -590,6 +655,11 @@ function updateSummary(){const i=S.cur,snap=snapshot(i).filter(s=>!S.hidden.has(
   document.getElementById('sSell').textContent=snap.length?`${snap[snap.length-1].sector} ${fmt(snap[snap.length-1].x)}億`:'—';
   document.getElementById('sIn').textContent=snap.filter(s=>s.x>0).length;
   document.getElementById('sOut').textContent=snap.filter(s=>s.x<0).length;
+  var mtw=document.getElementById('mktTideWrap'),mt=document.getElementById('mktTide'),tide=marketRoll5(i);
+  if(mtw)mtw.style.display=(tide==null)?'none':'';
+  if(mt&&tide!=null){var neg=tide<0,tops=counterTops(i);
+    mt.innerHTML=(neg?'退潮':'漲潮')+' '+fmt(tide)+' 億/天'+((neg&&S.counterHi&&tops.length)?(' ｜ 逆勢強勢 <b style="color:#ffd24a">'+tops.join('、')+'</b>'):(neg&&S.counterHi?' ｜ 逆勢強勢 無':''));
+    mt.style.color=neg?'var(--out)':'var(--in)';}
   const c={chao:0,lun:0,guan:0,tui:0};snap.forEach(s=>c[s.q]++);
   // 依圖上實際方位排：左上觀望／右上漲潮／左下退潮／右下輪動
   const defs=[['chao','漲潮⭐','右上','加速流入'],['lun','輪動','右下','流入但放緩'],['tui','退潮','左下','流出加速'],['guan','觀望','左上','流出趨緩']];
@@ -822,6 +892,8 @@ function setDim(d){S.dim=d;S.qfilter=null;
   if(S.tab==='heat')renderHeat();if(S.tab==='rank')renderRank();}
 /* 右側 K 面板的標題與說明隨維度切換（產業＝龍頭股/指數；AI＝成員個股 K 線＋資金流疊加） */
 function toggleIndex(){S.showIndex=!S.showIndex;updateKsideText();renderKside();saveState();}
+function updateCounterBtn(){var b=document.getElementById('counterBtn');if(!b)return;b.classList.toggle('on',S.counterHi);var sw=document.getElementById('counterSw');if(sw)sw.textContent=S.counterHi?'開':'關';}
+function toggleCounter(){S.counterHi=!S.counterHi;updateCounterBtn();updateMap();updateSummary();saveState();}
 function updateKsideText(){var t=document.getElementById('ksideTitle'),d=document.getElementById('ksideDesc');if(!t||!d)return;
   var idxBtn=(typeof DATA!=='undefined'&&DATA&&DATA.market)?'<button class="addbtn idxbtn'+(S.showIndex?' on':'')+'" onclick="toggleIndex()" title="顯示/隱藏 加權指數(大盤) 基準：指數K線＋全市場三大法人買賣超">加權指數</button> ':'';
   var pick='<button class="addbtn" onclick="openModal(\'mPick\')">＋ 選擇'+(S.dim==='ai'?'主題':'板塊')+'</button>';
@@ -842,12 +914,13 @@ function setAllSec(on){if(on)S.hidden.clear();else curSectors().forEach(s=>S.hid
 function renderPick(){document.getElementById('pickList').innerHTML=curSectors().map(s=>
   `<label><input type="checkbox" ${S.pinned.has(s.sector)?'checked':''} onchange="pickSec('${s.sector}',this.checked)">${s.sector}</label>`).join('');}
 function pickSec(name,on){if(on)S.pinned.add(name);else S.pinned.delete(name);renderKside();updateMap();}
+function gjump(id){var e=document.getElementById(id);if(e)e.scrollIntoView({behavior:'smooth',block:'start'});}
 function openModal(id){if(id==='mPick')renderPick();document.getElementById(id).classList.add('show');}
 function closeModal(id){document.getElementById(id).classList.remove('show');}
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('show');}));
 
 /* ===== persistence (記住使用者的釘選與設定) ===== */
-function saveState(){try{localStorage.setItem('tide_state',JSON.stringify({color:S.color,range:S.range,trail:S.trail,norm:S.norm,dim:S.dim,ksideW:S.ksideW,showIndex:S.showIndex,kmode:S.kmode,pinned:[...S.pinned],hidden:[...S.hidden]}));}catch(e){}}
+function saveState(){try{localStorage.setItem('tide_state',JSON.stringify({color:S.color,range:S.range,trail:S.trail,norm:S.norm,dim:S.dim,ksideW:S.ksideW,showIndex:S.showIndex,counterHi:S.counterHi,kmode:S.kmode,pinned:[...S.pinned],hidden:[...S.hidden]}));}catch(e){}}
 function loadState(){try{var j=JSON.parse(localStorage.getItem('tide_state'));if(!j)return;
   if(j.color)S.color=j.color;if(j.range)S.range=j.range;
   if(typeof j.trail==='number')S.trail=j.trail;
@@ -855,6 +928,7 @@ function loadState(){try{var j=JSON.parse(localStorage.getItem('tide_state'));if
   if(j.dim==='twse'||j.dim==='ai')S.dim=j.dim;
   if(typeof j.ksideW==='number')S.ksideW=j.ksideW;
   if(typeof j.showIndex==='boolean')S.showIndex=j.showIndex;
+  if(typeof j.counterHi==='boolean')S.counterHi=j.counterHi;
   if(j.kmode)S.kmode=j.kmode;
   if(Array.isArray(j.pinned))S.pinned=new Set(j.pinned);
   if(Array.isArray(j.hidden))S.hidden=new Set(j.hidden);}catch(e){}}
@@ -882,6 +956,7 @@ function init(){
   const dsel=document.getElementById('dimSel');if(dsel&&!hasAI)dsel.style.display='none';  // 無 AI 資料則隱藏切換器
   document.querySelectorAll('#dimSel button').forEach(b=>b.classList.toggle('on',b.dataset.d===S.dim));
   updateKsideText();
+  var cb=document.getElementById('counterBtn');if(cb){cb.style.display=DATA.market?'':'none';updateCounterBtn();}
   computeDomain();buildMap();
   autoPinTop3();   // 當前維度若無釘選，預設前三大（dim-aware）
   renderToggles();
@@ -895,6 +970,7 @@ function init(){
   setRange(S.range);                                        // 設定時間軸範圍並繪製
   setNorm(S.norm);                                          // 還原座標尺度並同步按鈕
   initSplitter();
+  var vl=document.getElementById('verLbl');if(vl)vl.textContent='版本 '+APP_VER+'（更新 '+APP_DATE+'）　｜　';
   window.addEventListener('beforeunload',saveState);
   setInterval(saveState,2000);
   // 螢幕尺寸變更（含手機↔桌機切換、旋轉）時重新套用畫布尺寸與重繪
@@ -914,6 +990,7 @@ function applyData(d){DATA=d;SECID={};DATA.sectors.forEach(function(s,i){SECID[s
   if(dsel)dsel.style.display=hasAI?'':'none';
   document.querySelectorAll('#dimSel button').forEach(function(b){b.classList.toggle('on',b.dataset.d===S.dim);});
   updateKsideText();
+  var cb=document.getElementById('counterBtn');if(cb){cb.style.display=DATA.market?'':'none';updateCounterBtn();}
   computeDomain();buildMap();autoPinTop3();renderToggles();renderKside();setRange(S.range);updatedLabel();}
 function boot(){fetch('data.json',{cache:'no-store'}).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(d){DATA=d;}).catch(function(){}).then(function(){init();updatedLabel();});}
 function reload(){var b=document.getElementById('refreshBtn');if(b)b.textContent='\u23f3';fetch('data.json',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){applyData(d);}).catch(function(){}).then(function(){if(b)b.textContent='\ud83d\udd04';});}

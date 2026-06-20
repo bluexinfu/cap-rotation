@@ -250,11 +250,12 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
   .chipline{font-size:.78em;line-height:1.6}
   /* 主區改直向捲動 */
   .main{flex-direction:column;gap:10px;padding:0 12px 16px;overflow:visible}
-  /* 象限 2×2 地圖 + 常駐說明 */
-  .sidebar{display:flex;flex-direction:column;gap:8px;width:auto;order:1}
-  .qmap{gap:8px}
-  .qcell{padding:9px 11px}
-  .qcell .t{font-size:.88em} .qcell .n{font-size:1.5em} .qcell .d{font-size:.66em}
+  /* 四象限：四顆等寬並排一行、說明小字移到下方置中 */
+  .qmap .qcells{flex-wrap:wrap;gap:5px;width:100%}
+  .qmap .qcell{flex:1 1 0;width:auto;min-width:0;padding:5px 4px;text-align:center}
+  .qmap .qcell .ori{display:none}
+  .qmap .qcell .t{font-size:.74em} .qmap .qcell .n{font-size:1.2em} .qmap .qcell .d{font-size:.56em}
+  .qmap .caphint{order:99;flex:0 0 100%;text-align:center;margin:5px 0 0;position:static}
   .sideguide{font-size:.8em}
   .guidebar{display:none}
   /* 圖表卡：高度依寬度，正方形畫布剛好填滿不留白 */

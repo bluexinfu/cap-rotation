@@ -30,8 +30,11 @@
 import json, os, sys, time, datetime, urllib.request
 
 NDAYS   = int(os.environ.get("NDAYS", "75"))     # 目標交易日數
+FINMIND_TOKEN = os.environ.get("FINMIND_TOKEN", "").strip()  # FinMind 備援用（免費註冊取得；存成 GitHub secret）
 UA      = {"User-Agent": "Mozilla/5.0 (compatible; tide-data-bot/1.0)"}
 T86_URL = "https://www.twse.com.tw/rwd/zh/fund/T86?date={d}&selectType={t}&response=json"
+# FinMind 全市場三大法人（T86 端點延遲/缺資料時的備援；全市場查詢需 token）
+FINMIND_INST_URL = "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInstitutionalInvestorsBuySell&start_date={s}&end_date={e}"
 MI_URL  = "https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date={d}&type=ALLBUT0999&response=json"
 # 上櫃(TPEx/櫃買中心) — AI 主題成員有部分為上櫃股(群聯/旺矽/精測/雙鴻/威剛/聯亞)，需另抓
 TPEX_INST  = "https://www.tpex.org.tw/web/stock/3insti/daily_trade/3itrade_hedge_result.php?l=zh-tw&o=json&se=EW&t=D&d={d}"
@@ -113,6 +116,42 @@ def num(s):
     try: return float(s)
     except: return 0.0
 
+def fetch_t86_finmind(ds):
+    """TWSE T86 端點延遲/缺資料時的備援。
+    用 FinMind 全市場三大法人資料，重建成 T86 風格 dict：
+        {"stat":"OK", "data":[[股票代號, "", 三大法人淨買股數], ...], "_src":"finmind"}
+    主程式只用每列的 r[0]（代號）與 r[-1]（淨買股數），故只需這兩個欄位對齊即可。
+    需 FINMIND_TOKEN（免費註冊）才能做「全市場」查詢；無 token 或查無資料回 None。"""
+    if not FINMIND_TOKEN:
+        return None
+    s = f"{ds[:4]}-{ds[4:6]}-{ds[6:8]}"
+    url = FINMIND_INST_URL.format(s=s, e=s) + f"&token={FINMIND_TOKEN}"
+    d = fetch(url)
+    if not d or d.get("status") != 200 or not d.get("data"):
+        return None
+    agg = {}   # 代號 -> 三大法人合計淨買股數（各法人別 buy-sell 加總）
+    for r in d["data"]:
+        sid = str(r.get("stock_id", "")).strip()
+        if not sid:
+            continue
+        agg[sid] = agg.get(sid, 0.0) + (num(r.get("buy")) - num(r.get("sell")))
+    if not agg:
+        return None
+    rows = [[sid, "", v] for sid, v in agg.items()]
+    return {"stat": "OK", "data": rows, "_src": "finmind"}
+
+def fetch_t86(ds):
+    """取某日 T86（三大法人）：先用 TWSE 官方端點，缺資料時改用 FinMind 備援。
+    回傳與原 T86 相容的 dict（成功時 stat=='OK'）。"""
+    r = fetch(T86_URL.format(d=ds, t="ALL"))
+    if r and r.get("stat") == "OK" and r.get("data"):
+        return r
+    fb = fetch_t86_finmind(ds)
+    if fb:
+        print(f"  ⚠ T86 {ds} TWSE 端點缺資料，改用 FinMind 備援（{len(fb['data'])} 檔）", file=sys.stderr)
+        return fb
+    return r   # 原樣回傳（可能是 no-data，交由呼叫端判斷）
+
 def build_stock_sector(dates):
     """逐產業查 T86 建立 股票代號 -> 產業 對照。
     為避免「最新一日盤後資料尚未完整」而漏掉某些產業，會依序嘗試多個近日，
@@ -189,7 +228,7 @@ def latest_trading_day():
     d = datetime.date.today()
     for _ in range(15):
         ds = d.strftime("%Y%m%d")
-        r = fetch(T86_URL.format(d=ds, t="ALL"))
+        r = fetch_t86(ds)
         time.sleep(0.4)
         if r and r.get("stat") == "OK":
             return d
@@ -249,7 +288,7 @@ def main():
         d -= datetime.timedelta(days=1)
         if datetime.datetime.strptime(ds, "%Y%m%d").weekday() >= 5:
             continue
-        t86 = fetch(T86_URL.format(d=ds, t="ALL"))
+        t86 = fetch_t86(ds)
         time.sleep(0.4)
         if not t86 or t86.get("stat") != "OK":
             continue
@@ -270,6 +309,10 @@ def main():
         names_all.update(onm)
         otc_seen.update(onv.keys())
         mkt = fetch_mkt_netbuy(ds); time.sleep(0.3)   # 大盤三大法人合計買賣差額(元)
+        # 大盤合計端點(BFI82U)也可能與 T86 同步延遲；若這天走 FinMind 備援且 BFI 拿不到，
+        # 用「全市場 Σ(淨買股數×收盤)」近似三大法人合計買賣差額，避免大盤資金流當天空白。
+        if not mkt and t86.get("_src") == "finmind":
+            mkt = sum(num(r[-1]) * close.get(r[0].strip(), 0) for r in t86["data"])
         days.append({"date":ds,"sv":sv,"mv":mv,"ix":idx,"oh":ohlc,"mkt":mkt,"otc_sh":dict(onv)})
         names_all.update(names)
         print("  ok", ds, "累計", len(days), file=sys.stderr)

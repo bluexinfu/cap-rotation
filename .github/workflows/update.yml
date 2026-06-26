@@ -2,8 +2,11 @@ name: update-data  # 每交易日盤後自動更新資料
 
 on:
   schedule:
-    # 每週一到週五 UTC 10:30 = 台灣時間 18:30（盤後法人資料通常已公布）
-    - cron: '30 10 * * 1-5'
+    # 同一交易日跑多個時段，涵蓋 TWSE 出表延遲；commit 只在資料有變動時發生，故重跑是冪等、零成本。
+    # 時間為 UTC（台灣 = UTC+8）。
+    - cron: '30 10 * * 1-5'   # 台灣 18:30（首次：盤後法人資料通常已公布）
+    - cron: '0 13 * * 1-5'    # 台灣 21:00（補抓當晚較晚才出表的日子）
+    - cron: '0 23 * * 1-5'    # 隔日台灣 07:00（週五的資料若拖到隔天，週六上午補回）
   workflow_dispatch:        # 也可在 Actions 頁手動執行
 
 permissions:
@@ -29,6 +32,7 @@ jobs:
         run: python build_data.py
         env:
           NDAYS: '75'
+          FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}   # TWSE T86 端點延遲時的備援來源（免費註冊取得）
 
       - name: Commit & push if changed
         run: |
@@ -38,6 +42,8 @@ jobs:
           if git diff --cached --quiet; then
             echo "資料無變動，略過 commit"
           else
-            git commit -m "data: update $(date -u +%Y-%m-%d)"
+            # commit 訊息用 data.json 內實際最新交易日，而非執行日，避免「跑了卻沒新增交易日」被誤判為已更新
+            LATEST=$(python -c "import json;print(json.load(open('data.json'))['updated'])")
+            git commit -m "data: update ${LATEST}"
             git push
           fi

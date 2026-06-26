@@ -45,5 +45,19 @@ jobs:
             # commit 訊息用 data.json 內實際最新交易日，而非執行日，避免「跑了卻沒新增交易日」被誤判為已更新
             LATEST=$(python -c "import json;print(json.load(open('data.json'))['updated'])")
             git commit -m "data: update ${LATEST}"
-            git push
+            # 推送前先同步雲端：建置可能耗時 20+ 分，期間若有人改了 repo（或排程撞期），
+            # 直接 push 會被拒而整批白做。改為 fetch + rebase 後再 push，並自動重試 3 次。
+            BR="${GITHUB_REF_NAME:-master}"
+            PUSHED=0
+            for i in 1 2 3; do
+              git fetch origin "$BR"
+              git rebase "origin/$BR" || git rebase --abort 2>/dev/null || true
+              if git push origin "HEAD:$BR"; then
+                PUSHED=1; echo "推送成功（第 $i 次嘗試）"; break
+              fi
+              echo "推送被拒，已同步雲端後重試（第 $i 次）…"; sleep 5
+            done
+            if [ "$PUSHED" != "1" ]; then
+              echo "::error::推送多次仍失敗，請檢查 repo 狀態"; exit 1
+            fi
           fi

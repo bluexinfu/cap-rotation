@@ -346,7 +346,7 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
 
             <div class="sec"><b class="h">④ 兩種分群（右上切換）</b>：<b>證交所產業</b> ↔ <b>AI 主題</b>（10 個 AI 供應鏈子題＋台積電獨立）。點泡泡可釘到右側看 K 線；AI 主題點下去看<b>成員個股</b>的「股價 K 線＋法人資金流」對照。座標可切「金額」或「相對強度(÷自身波動)」。</div>
 
-            <div class="sec"><b class="h">⑤ 大盤潮汐 + 逆勢強勢</b>：摘要列顯示全市場法人是<span class="pos">漲潮（買）</span>還<span class="neg">退潮（賣）</span>。<b>大盤退潮時</b>，仍逆勢流入、且相對強度(÷自身波動)最強的<b>前 5 個</b>板塊會用<b style="color:#ffd24a">金色 🌊</b> 高亮——退潮中最強勢的標的。</div>
+            <div class="sec"><b class="h">⑤ 大盤潮汐 + 逆勢強勢</b>：摘要列顯示全市場法人是<span class="pos">漲潮（買）</span>還<span class="neg">退潮（賣）</span>。<b>大盤退潮時</b>，仍逆勢流入、且相對強度(÷自身波動)<b>達 1σ 以上</b>、最強的<b>前 5 個</b>板塊會用<b style="color:#ffd24a">金色 🌊</b> 高亮——退潮中真正最強勢的標的。<b>門檻 1σ 與中性灰一致</b>（沒真的動就不算強）；若當天沒有夠強的逆勢板塊，金色就不顯示，不硬標弱盤裡的矮個。</div>
 
             <div class="sec"><b class="h">⑥ K 線區（右側）</b>：看「價格 vs 籌碼」對照。「<b>加權指數</b>」鈕可叫出大盤基準卡；中間分隔線可拖曳調整寬度。下方時間軸可播放／逐日切換看輪動。</div>
 
@@ -565,13 +565,15 @@ function marketRoll5(i){if(!DATA.market||!DATA.market.flow)return null;const f=D
 /* 逆勢強勢：大盤退潮(tide<0)，但這個板塊自己仍淨流入(x>0)且力道沒減速(y>=0)＝逆勢還在擴大。 */
 function isCounter(m,tide){return tide!=null&&tide<0&&m.x>0&&m.y>=0;}
 const COUNTER_TOPN=5;
+const COUNTER_MIN_SIGMA=1.0;   /* R14：逆勢強勢最低門檻——相對強度需 ≥ 1σ 才算「真的強」，與 R8 中性門檻對齊（見 ADR-0009），濾掉弱盤裡不夠強的矮個 */
 /* 退潮時，從所有「逆勢」候選中，只取相對強度(x/自身σ)最強的前 N 名 —— 消除大小偏誤、限制數量，
    標出的才是「退潮中真正最強」的板塊。回傳板塊名稱陣列。 */
 function counterTops(pos){const f=Math.floor(pos),tide=marketRoll5(f);
   if(!S.counterHi||tide==null||tide>=0)return [];
   const cand=[];
   curSectors().forEach(sec=>{if(S.hidden.has(sec.sector))return;const m=metricsAt(sec,pos);
-    if(isCounter(m,tide))cand.push({name:sec.sector,str:m.x/sigma(sec)});});
+    const rel=S.norm?m.x:m.x/sigma(sec);   /* 相對強度＝原始x/自身σ，與座標模式無關 */
+    if(isCounter(m,tide)&&rel>=COUNTER_MIN_SIGMA)cand.push({name:sec.sector,str:rel});});
   cand.sort((a,b)=>b.str-a.str);
   return cand.slice(0,COUNTER_TOPN).map(c=>c.name);}
 

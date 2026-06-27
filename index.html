@@ -316,6 +316,7 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
       <button class="iconbtn" title="資料更新機制說明" onclick="openModal('mUpd')">ⓘ</button>
       <button class="iconbtn" title="完整新手指南" onclick="openModal('mGuide')">📖 完整新手指南</button>
       <button class="iconbtn" title="設定" onclick="openModal('mSet')">⚙ 設定</button>
+      <button class="iconbtn" id="verBtn" title="版本與更新紀錄" onclick="openModal('mLog')">📋 版本</button>
     </div>
   </div>
 
@@ -483,6 +484,31 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
   </div>
 </div></div>
 
+<!-- changelog highlights -->
+<div class="modal" id="mLog"><div class="box">
+  <button class="x" onclick="closeModal('mLog')">×</button>
+  <h3>📋 更新紀錄</h3>
+  <div class="guide">
+    <p><b style="color:var(--accent)">v0.4.0</b> <span class="note">· 2026-06-27</span></p>
+    <ul>
+      <li><b>新增「市場相對」座標</b>：座標可切第 3 種尺度，看「撇開大盤、這板塊相對大盤是強是弱」(右＝強於大盤、左＝弱於大盤)。</li>
+      <li><b>中性灰與逆勢強勢改用各板塊自身波動 σ</b>：大小板塊公平比較、畫面更穩、不再硬標弱盤裡的「矮子裡的高個」。</li>
+      <li><b>資料更新更穩</b>：來源延遲時自動用備援補上、一天多時段重試、若更新停擺會自動寄信通知。</li>
+      <li>四象限卡的方位標(右上/右下/左下/左上)更清楚，手機也看得到。</li>
+    </ul>
+    <p><b>v0.3.0</b> <span class="note">· 2026-06-18</span></p>
+    <ul>
+      <li>新增「AI 主題」分群維度(10 個 AI 供應鏈子題＋台積電獨立)、點主題看成員 K 線＋資金流疊加。</li>
+      <li>加權指數大盤基準卡、大盤潮汐狀態＋逆勢強勢高亮、上櫃資料源、整體介面改版。</li>
+    </ul>
+    <p><b>v0.2.x</b> <span class="note">· 2026-06</span></p>
+    <ul>
+      <li>相對強度座標(消除大型股偏誤)、時間基準同步、軸名與圖例修正，並建立產品治理體系。</li>
+    </ul>
+    <p class="note">完整逐項變更見專案 CHANGELOG。本工具為資金流觀察,非投資建議。</p>
+  </div>
+</div></div>
+
 <!-- settings -->
 <div class="modal" id="mSet"><div class="box">
   <button class="x" onclick="closeModal('mSet')">×</button>
@@ -530,7 +556,7 @@ function setDims(){
   var s=document.getElementById('svg');if(s)s.setAttribute('viewBox','0 0 '+W+' '+H);
 }
 const WIN=5,BASE=5,CUM=20,I0=WIN+BASE-1,EMA_SPAN=3;
-const APP_VER='v0.3.0',APP_DATE='2026-06-18';   // 版本資訊（顯示於頁尾）；發版時更新
+const APP_VER='v0.4.0',APP_DATE='2026-06-27';   // 版本資訊（顯示於工具列＋頁尾、可點開更新紀錄 mLog）；發版時更新
 const S={tab:'map',color:'tw',trail:6,labels:true,search:'',hidden:new Set(),pinned:new Set(),
   range:40, kmode:{}, cur:0,pos:0, playing:false,spd:1.4,raf:null,lastT:null, qfilter:null, norm:false, scale:0, dim:'twse', ksideW:0, showIndex:false, counterHi:true};
 const QNAME={chao:'漲潮',lun:'輪動',guan:'觀望',tui:'退潮'};
@@ -999,7 +1025,8 @@ function init(){
   setRange(S.range);                                        // 設定時間軸範圍並繪製
   setScale(S.scale);                                        // 還原座標尺度並同步按鈕（3 態）
   initSplitter();
-  var vl=document.getElementById('verLbl');if(vl)vl.textContent='版本 '+APP_VER+'（更新 '+APP_DATE+'）　｜　';
+  var vl=document.getElementById('verLbl');if(vl){vl.textContent='版本 '+APP_VER+'（更新 '+APP_DATE+'）　｜　';vl.style.cursor='pointer';vl.title='點看更新紀錄';vl.onclick=function(){openModal('mLog');};}
+  var vb=document.getElementById('verBtn');if(vb)vb.textContent='📋 '+APP_VER;
   window.addEventListener('beforeunload',saveState);
   setInterval(saveState,2000);
   // 螢幕尺寸變更（含手機↔桌機切換、旋轉）時重新套用畫布尺寸與重繪

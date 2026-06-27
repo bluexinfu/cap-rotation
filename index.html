@@ -337,7 +337,7 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
             <b>橫軸｜近5日日均淨買（億/天，平滑）</b>：<span class="pos">右＝流入</span>、<span class="neg">左＝流出</span>。先做指數加權平滑(EMA)再取5日均，是<b>趨勢值</b>、壓掉單日大單雜訊。<br>
             <b>縱軸｜力道變化（本週日均 − 上週日均）</b>：<span class="pos">上＝比上週更偏買</span>、<span class="neg">下＝更偏賣</span>。是力道的<b>變化、不是方向</b>；「加速／放緩」要配合橫軸看。</div>
 
-            <div class="sec"><b class="h">② 圈圈</b>：大小＝近20日資金量級、顏色＝近5日方向（兩個不同週期）。</div>
+            <div class="sec"><b class="h">② 圈圈</b>：大小＝近20日資金量級、顏色＝近5日方向（<span class="pos">流入橘</span>／<span class="neg">流出綠</span>／中性灰，兩個不同週期）。<br><b>中性灰</b>＝這段資金流相對「<b>該板塊自己平常的波動</b>」還不算大（門檻＝各板塊自身 1 個標準差σ，<b>不是</b>固定金額）。所以大板塊（如半導體）只有真的爆量才會亮、平常多為灰；小板塊也用自己的尺，<b>大小板塊公平比較</b>。</div>
 
             <div class="sec"><b class="h">③ 四象限</b>（順時針輪動）<br>
             ⭐<b>漲潮</b>（右上）流入且加速、最強｜<b>輪動</b>（右下）仍流入但放緩<br>
@@ -596,8 +596,10 @@ function computeDomain(){const C=tkcfg();LTX=C.ltx;LTY=C.lty;let xs=[],ys=[],sz=
 const sx=v=>M.l+(txf(v)-XR[0])/(XR[1]-XR[0])*PW;
 const sy=v=>M.t+(1-(tyf(v)-YR[0])/(YR[1]-YR[0]))*PH;
 function rad(sz){const mob=isMobile();return (mob?15:11)+(mob?46:34)*Math.sqrt(Math.abs(sz)/MAXSZ);}
-function col(x){const inflow=x>=0;const red=(S.color==='tw')?inflow:!inflow;
-  if(Math.abs(x)<(S.norm?0.3:3))return{f:'#74827a',s:'#93a298'};
+function col(x,sec){const inflow=x>=0;const red=(S.color==='tw')?inflow:!inflow;
+  /* 中性灰門檻：各板塊「自身波動 1σ」（與座標模式無關，見 ADR-0008）。x 傳入為原始近5日日均(億)。 */
+  const thr=sec?sigma(sec):3;
+  if(Math.abs(x)<thr)return{f:'#74827a',s:'#93a298'};
   return red?{f:'#e06a3c',s:'#ff8a55'}:{f:'#27a978',s:'#42d89a'};}
 function upcol(up){const red=(S.color==='tw')?up:!up;return red?'#e06a3c':'#27a978';}
 
@@ -638,7 +640,7 @@ function updateMap(){updateMapAt(S.pos);}
 function updateMapAt(pos){const qf=S.qfilter,f=Math.floor(pos);
   const counterSet=new Set(counterTops(pos));
   curSectors().forEach(sec=>{const n=nodes[sec.sector];if(!n)return;
-    const m=metricsAt(sec,pos),X=sx(m.x),Y=sy(m.y),r=rad(m.sz),c=col(m.x),q=quad(m.x,m.y);
+    const m=metricsAt(sec,pos),X=sx(m.x),Y=sy(m.y),r=rad(m.sz),c=col(S.norm?m.x*sigma(sec):m.x,sec),q=quad(m.x,m.y);
     const ctr=counterSet.has(sec.sector);
     const vis=!S.hidden.has(sec.sector)&&(!S.search||sec.sector.includes(S.search))&&(!qf||q===qf);
     n.g.style.display=vis?'':'none';
@@ -662,7 +664,7 @@ function updateMapAt(pos){const qf=S.qfilter,f=Math.floor(pos);
     n.g.classList.toggle('dim',S.pinned.size>0&&!S.pinned.has(sec.sector));});}
 
 /* ===== summary / sidebar ===== */
-function snapshot(i){return curSectors().map(sec=>{const m=metrics(sec,i);return{sector:sec.sector,...m,q:quad(m.x,m.y)};});}
+function snapshot(i){return curSectors().map(sec=>{const m=metrics(sec,i);return{sector:sec.sector,sec,...m,q:quad(m.x,m.y)};});}
 function updateSummary(){const i=S.cur,snap=snapshot(i).filter(s=>!S.hidden.has(s.sector)).sort((a,b)=>b.x-a.x);
   document.getElementById('curDate').textContent=fmtDate(DATA.dates[i]);
   document.getElementById('sBuy').textContent=snap.length?`${snap[0].sector} ${fmt(snap[0].x)}億`:'—';
@@ -870,7 +872,7 @@ function renderRank(){const i=S.cur,snap=snapshot(i).filter(s=>!S.hidden.has(s.s
   snap.sort((a,b)=>sortDir*(a[sortKey]-b[sortKey]));
   const cols=[['sector','板塊'],['x','近5日日均(平滑)'],['sz','近20日(億)'],['y','動能'],['q','象限']];
   let h='<thead><tr>';cols.forEach(([k,t])=>h+=`<th class="${k===sortKey?'sorted':''}" onclick="setSort('${k}')">${t}</th>`);h+='</tr></thead><tbody>';
-  snap.forEach(s=>{const c=col(s.x);h+=`<tr onclick="togglePin('${s.sector}')"><td><span class="dotc" style="background:${c.f}"></span>${s.sector}${S.pinned.has(s.sector)?' 📌':''}</td>
+  snap.forEach(s=>{const c=col(s.x,s.sec);h+=`<tr onclick="togglePin('${s.sector}')"><td><span class="dotc" style="background:${c.f}"></span>${s.sector}${S.pinned.has(s.sector)?' 📌':''}</td>
     <td class="${s.x>=0?'pos':'neg'}">${fmt(s.x)}</td><td class="${s.sz>=0?'pos':'neg'}">${fmt(s.sz)}</td>
     <td class="${s.y>=0?'pos':'neg'}">${fmt(s.y)}</td><td>${QNAME[s.q]}</td></tr>`;});
   h+='</tbody>';document.getElementById('rank').innerHTML=h;}

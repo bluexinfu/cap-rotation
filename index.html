@@ -305,8 +305,9 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
         <button data-d="ai" onclick="setDim('ai')">AI 主題</button>
       </div>
       <div class="rangesel" id="normSel" title="座標尺度：金額看真實資金量；相對強度把各板塊用自身波動標準化，消除大型股永遠最大的偏誤，較適合比較『輪動』">
-        <button data-n="0" class="on" onclick="setNorm(false)">金額(億)</button>
-        <button data-n="1" onclick="setNorm(true)">相對強度</button>
+        <button data-n="0" class="on" onclick="setScale(0)">金額(億)</button>
+        <button data-n="1" onclick="setScale(1)">相對強度</button>
+        <button data-n="2" onclick="setScale(2)">市場相對</button>
       </div>
       <button class="iconbtn ctrtog" id="counterBtn" onclick="toggleCounter()" title="逆勢強勢高亮：當「大盤潮汐」退潮（全市場法人在賣）時，把仍逆勢被買、且力道還在擴大、相對強度最強的前5個板塊用金色標出——幫你找退潮中最抗跌/最強勢的標的。漲潮日不會有高亮。">🌊 逆勢強勢 <span class="swst" id="counterSw">關</span></button>
       <div class="search">🔍<input id="searchIn" placeholder="搜尋板塊…"></div>
@@ -344,7 +345,7 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
             <b>退潮</b>（左下）流出加速、越流越多｜<b>觀望</b>（左上）流出趨緩、可能回穩<br>
             <span class="ex" style="margin:6px 0 0;padding:0;border:0">例：前一週日均買 +15 億、這週降到 +10 億 → 仍淨買（在右邊）但加速度 −5（在下面）＝流入但放緩。減速 ≠ 倒車。</span></div>
 
-            <div class="sec"><b class="h">④ 兩種分群（右上切換）</b>：<b>證交所產業</b> ↔ <b>AI 主題</b>（10 個 AI 供應鏈子題＋台積電獨立）。點泡泡可釘到右側看 K 線；AI 主題點下去看<b>成員個股</b>的「股價 K 線＋法人資金流」對照。座標可切「金額」或「相對強度(÷自身波動)」。</div>
+            <div class="sec"><b class="h">④ 兩種分群（右上切換）</b>：<b>證交所產業</b> ↔ <b>AI 主題</b>（10 個 AI 供應鏈子題＋台積電獨立）。點泡泡可釘到右側看 K 線；AI 主題點下去看<b>成員個股</b>的「股價 K 線＋法人資金流」對照。座標可切「金額」「相對強度(÷自身波動)」或「市場相對(再扣掉大盤共同潮水、看相對大盤強弱)」。</div>
 
             <div class="sec"><b class="h">⑤ 大盤潮汐 + 逆勢強勢</b>：摘要列顯示全市場法人是<span class="pos">漲潮（買）</span>還<span class="neg">退潮（賣）</span>。<b>大盤退潮時</b>，仍逆勢流入、且相對強度(÷自身波動)<b>達 1σ 以上</b>、最強的<b>前 5 個</b>板塊會用<b style="color:#ffd24a">金色 🌊</b> 高亮——退潮中真正最強勢的標的。<b>門檻 1σ 與中性灰一致</b>（沒真的動就不算強）；若當天沒有夠強的逆勢板塊，金色就不顯示，不硬標弱盤裡的矮個。</div>
 
@@ -435,6 +436,7 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
     原始數字很容易騙人，我做了三件事讓它不誤導自己：<br>
     • <b>平滑（EMA）</b>：某天一筆大單就能讓數字暴衝。所以我先把每日淨買做「<b>指數加權平滑</b>」<span class="term">（近幾天權重高的一種平均，壓掉單日雜訊）</span>，看的是趨勢、不是單點。<br>
     • <b>相對強度（÷自身波動）</b>：大型股（像半導體）的錢天生就大，會永遠被推到圖的外圍，看起來最強——但那是「盤子大」不是「真的在輪動」。所以提供一個切換，把每個板塊除以<b>它自己的波動度</b><span class="term">（σ，衡量它平常進出多大）</span>，放到同一把尺上公平比。<br>
+    • <b>市場相對（再扣掉大盤潮水）</b>：第三把尺。先把每個板塊換成「自身σ強度」，再扣掉「當天所有板塊的平均」<span class="term">（＝大盤共同潮水）</span>，看的是「<b>撇開大盤整體在買還在賣，這板塊自己相對大盤是強還弱</b>」。右＝強於大盤、左＝弱於大盤；中間 ±1σ＝跟大盤差不多（中性灰）。<br>
     • <b>X、Y 同單位</b>：兩軸都用「億/天」，這樣縱軸（力道變化）<b>剛好就是橫軸的變化量</b>，整張圖的邏輯才自洽、不打架。</div>
 
     <div class="why"><span class="q">4. 為什麼多做一套「AI 主題」分類？</span>
@@ -449,7 +451,7 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
     <h4 id="gC">③ 操作速查</h4>
     <ul>
       <li><b>三個分頁</b>：<b>輪動軌跡</b>（主圖）、<b>資金熱力圖</b>（每天每板塊的買賣超色塊）、<b>排行榜</b>（當天排名）。</li>
-      <li><b>上方切換鈕</b>：時間範圍（20/40/60 日）、<b>證交所產業 ↔ AI 主題</b>、<b>金額 ↔ 相對強度</b>、<b>🌊 逆勢強勢</b> 高亮開關。</li>
+      <li><b>上方切換鈕</b>：時間範圍（20/40/60 日）、<b>證交所產業 ↔ AI 主題</b>、座標尺度<b>金額／相對強度／市場相對</b>、<b>🌊 逆勢強勢</b> 高亮開關。</li>
       <li><b>圖表上方四象限按鈕</b>：點一下＝只看該象限的板塊（再點一次取消）。</li>
       <li><b>時間軸（下方）</b>：▶ 播放看資金一天天移動；⏮⏭ 或鍵盤 ← →、空白鍵 逐日／播放暫停；也可直接拖。</li>
       <li><b>點泡泡</b>：釘到右側 K 線區對照；AI 主題模式點下去看<b>成員個股 K 線＋資金流</b>。</li>
@@ -530,7 +532,7 @@ function setDims(){
 const WIN=5,BASE=5,CUM=20,I0=WIN+BASE-1,EMA_SPAN=3;
 const APP_VER='v0.3.0',APP_DATE='2026-06-18';   // 版本資訊（顯示於頁尾）；發版時更新
 const S={tab:'map',color:'tw',trail:6,labels:true,search:'',hidden:new Set(),pinned:new Set(),
-  range:40, kmode:{}, cur:0,pos:0, playing:false,spd:1.4,raf:null,lastT:null, qfilter:null, norm:false, dim:'twse', ksideW:0, showIndex:false, counterHi:true};
+  range:40, kmode:{}, cur:0,pos:0, playing:false,spd:1.4,raf:null,lastT:null, qfilter:null, norm:false, scale:0, dim:'twse', ksideW:0, showIndex:false, counterHi:true};
 const QNAME={chao:'漲潮',lun:'輪動',guan:'觀望',tui:'退潮'};
 const QORI={chao:'右上',lun:'右下',guan:'左上',tui:'左下'};
 let SECID={};
@@ -555,6 +557,8 @@ function metrics(sec,i){const sm=emaSeries(sec);return{x:roll5(sm,i),y:accel(sm,
 /* 各板塊以「自身日淨買超標準差」為尺度，標準化後可跨板塊比較（消除大型股偏誤）；不減均值故正負號不變，象限歸屬與絕對模式一致 */
 function sigma(sec){if(sec._sig==null){const s=sec.series,n=s.length||1;let m=0;for(const v of s)m+=v;m/=n;let q=0;for(const v of s)q+=(v-m)*(v-m);sec._sig=Math.sqrt(q/n)||1;}return sec._sig;}
 function mnorm(m,sec){if(!S.norm)return m;const g=sigma(sec);return{x:m.x/g,y:m.y/g,sz:m.sz/g};}
+/* 市場相對(ADR-0010)：當日所有顯示板塊的「平均σ強度(x/σ)」＝大盤共同潮水的σ空間版。市場相對X = 該板塊x/σ − 此平均。 */
+function marketBarAt(i){const ss=curSectors().filter(s=>!S.hidden.has(s.sector));if(!ss.length)return 0;let a=0;for(const sec of ss)a+=metrics(sec,i).x/sigma(sec);return a/ss.length;}
 function metricsAt(sec,pos){const last=LAST(),f=Math.min(last,Math.max(I0,Math.floor(pos))),r=Math.min(1,Math.max(0,pos-f));
   const a=metrics(sec,f);if(r===0||f>=last)return mnorm(a,sec);const b=metrics(sec,f+1);
   return mnorm({x:a.x+(b.x-a.x)*r,y:a.y+(b.y-a.y)*r,sz:a.sz+(b.sz-a.sz)*r},sec);}
@@ -581,26 +585,30 @@ function counterTops(pos){const f=Math.floor(pos),tide=marketRoll5(f);
 let LTX=5,LTY=1;
 const txf=v=>Math.sign(v)*Math.log10(1+Math.abs(v)/LTX);
 const tyf=v=>Math.sign(v)*Math.log10(1+Math.abs(v)/LTY);
-/* 兩種座標尺度：金額(絕對億) / 相對強度(各板塊÷自身波動) */
+/* 三種座標尺度：金額(絕對億) / 相對強度(各板塊÷自身波動) / 市場相對(σ強度再扣大盤共同潮水，見 ADR-0010) */
 const TKCFG={
   abs:{xt:[-200,-100,-50,-20,-10,-5,-1,0,1,5,10,20,50,100],yt:[-200,-100,-50,-20,-10,-5,-1,0,1,5,10,20,50],ltx:1,lty:1,
        xlab:'← 資金流出　近5日日均淨買（億/天）　資金流入 →',ylab:'力道變化（本週日均 − 上週日均·億/天）'},
   rel:{xt:[-20,-10,-5,-2,-1,0,1,2,5,10,20],yt:[-5,-2,-1,-0.5,0,0.5,1,2,5],ltx:1,lty:0.5,
-       xlab:'← 賣壓　近5日相對強度（×自身波動）　買盤 →',ylab:'資金動能（相對·×自身波動）'}};
-function tkcfg(){return S.norm?TKCFG.rel:TKCFG.abs;}
+       xlab:'← 賣壓　近5日相對強度（×自身波動）　買盤 →',ylab:'資金動能（相對·×自身波動）'},
+  mkt:{xt:[-5,-3,-2,-1,0,1,2,3,5],yt:[-5,-2,-1,-0.5,0,0.5,1,2,5],ltx:1,lty:0.5,
+       xlab:'← 弱於大盤　相對大盤強度（×自身σ、已扣大盤潮水）　強於大盤 →',ylab:'資金動能（相對·×自身波動）'}};
+function tkcfg(){return S.scale===2?TKCFG.mkt:(S.scale===1?TKCFG.rel:TKCFG.abs);}
 let XR,YR,MAXSZ;
 /* 目前維度的板塊（證交所產業 twse / AI 主題 ai）。沒有 dim 欄位的視為 twse，向後相容。 */
 function curSectors(){return DATA.sectors.filter(s=>(s.dim||'twse')===S.dim);}
 function computeDomain(){const C=tkcfg();LTX=C.ltx;LTY=C.lty;let xs=[],ys=[],sz=[];
-  curSectors().forEach(sec=>{for(let i=I0;i<DATA.dates.length;i++){const m=mnorm(metrics(sec,i),sec);xs.push(txf(m.x));ys.push(tyf(m.y));sz.push(Math.abs(m.sz));}});
+  const bar=[];if(S.scale===2){for(let i=0;i<DATA.dates.length;i++)bar[i]=marketBarAt(i);}   /* 市場相對：座標範圍也要用扣大盤後的 X */
+  curSectors().forEach(sec=>{for(let i=I0;i<DATA.dates.length;i++){const m=mnorm(metrics(sec,i),sec);const xv=(S.scale===2)?m.x-bar[i]:m.x;xs.push(txf(xv));ys.push(tyf(m.y));sz.push(Math.abs(m.sz));}});
   const pad=a=>{let mn=Math.min(...a),mx=Math.max(...a),sp=(mx-mn)||1;return[mn-sp*0.1,mx+sp*0.1];};
   XR=pad(xs);YR=pad(ys);MAXSZ=Math.max(...sz,1);}
 const sx=v=>M.l+(txf(v)-XR[0])/(XR[1]-XR[0])*PW;
 const sy=v=>M.t+(1-(tyf(v)-YR[0])/(YR[1]-YR[0]))*PH;
 function rad(sz){const mob=isMobile();return (mob?15:11)+(mob?46:34)*Math.sqrt(Math.abs(sz)/MAXSZ);}
 function col(x,sec){const inflow=x>=0;const red=(S.color==='tw')?inflow:!inflow;
-  /* 中性灰門檻：各板塊「自身波動 1σ」（與座標模式無關，見 ADR-0008）。x 傳入為原始近5日日均(億)。 */
-  const thr=sec?sigma(sec):3;
+  /* 中性灰門檻：金額/相對強度模式用各板塊「自身波動 1σ」（x 傳入為原始近5日日均億，見 ADR-0008）；
+     市場相對模式 x 已是「扣大盤後的σ值」，門檻固定 1（|市場相對|<1σ＝與大盤同步，見 ADR-0010）。 */
+  const thr=(S.scale===2)?1.0:(sec?sigma(sec):3);
   if(Math.abs(x)<thr)return{f:'#74827a',s:'#93a298'};
   return red?{f:'#e06a3c',s:'#ff8a55'}:{f:'#27a978',s:'#42d89a'};}
 function upcol(up){const red=(S.color==='tw')?up:!up;return red?'#e06a3c':'#27a978';}
@@ -641,12 +649,13 @@ function buildMap(){const svg=document.getElementById('svg');svg.innerHTML='';
 function updateMap(){updateMapAt(S.pos);}
 function updateMapAt(pos){const qf=S.qfilter,f=Math.floor(pos);
   const counterSet=new Set(counterTops(pos));
+  const mbar=(S.scale===2)?marketBarAt(f):0;   /* 市場相對：當日大盤共同潮水(σ空間) */
   curSectors().forEach(sec=>{const n=nodes[sec.sector];if(!n)return;
-    const m=metricsAt(sec,pos),X=sx(m.x),Y=sy(m.y),r=rad(m.sz),c=col(S.norm?m.x*sigma(sec):m.x,sec),q=quad(m.x,m.y);
+    const m=metricsAt(sec,pos),xd=(S.scale===2)?m.x-mbar:m.x,X=sx(xd),Y=sy(m.y),r=rad(m.sz),c=col(S.scale===2?xd:(S.norm?m.x*sigma(sec):m.x),sec),q=quad(xd,m.y);
     const ctr=counterSet.has(sec.sector);
     const vis=!S.hidden.has(sec.sector)&&(!S.search||sec.sector.includes(S.search))&&(!qf||q===qf);
     n.g.style.display=vis?'':'none';
-    if(S.trail>0){let pts=[];for(let j=Math.max(I0,f-S.trail);j<=f;j++){const mm=mnorm(metrics(sec,j),sec);pts.push(sx(mm.x).toFixed(1)+','+sy(mm.y).toFixed(1));}
+    if(S.trail>0){let pts=[];for(let j=Math.max(I0,f-S.trail);j<=f;j++){const mm=mnorm(metrics(sec,j),sec),tx=(S.scale===2)?mm.x-marketBarAt(j):mm.x;pts.push(sx(tx).toFixed(1)+','+sy(mm.y).toFixed(1));}
       pts.push(X.toFixed(1)+','+Y.toFixed(1));n.trail.setAttribute('points',pts.join(' '));n.trail.setAttribute('stroke',c.f);n.trail.style.display='';}
     else n.trail.style.display='none';
     n.dot.setAttribute('cx',X);n.dot.setAttribute('cy',Y);n.dot.setAttribute('r',r);
@@ -660,7 +669,7 @@ function updateMapAt(pos){const qf=S.qfilter,f=Math.floor(pos);
     n.lab.setAttribute('font-size',mob?Math.max(21,r*0.5):Math.max(9,r*0.4));
     n.lab.textContent=showLab?sec.sector+star+cmk:'';
     n.val.setAttribute('x',X);n.val.setAttribute('y',Y+r*0.46+4);n.val.setAttribute('font-size',Math.max(8,r*0.32));
-    n.val.textContent=(S.labels&&!mob)?fmt(m.x):'';   // 手機改用點按看數值，減少擁擠
+    n.val.textContent=(S.labels&&!mob)?fmt(xd):'';   // 手機改用點按看數值，減少擁擠
     n.g.classList.toggle('pinned',S.pinned.has(sec.sector));
     n.g.classList.toggle('counter',ctr);
     n.g.classList.toggle('dim',S.pinned.size>0&&!S.pinned.has(sec.sector));});}
@@ -701,7 +710,7 @@ function alignQuadBar(){var svg=document.getElementById('svg'),qmap=document.get
   cells.style.transform='translateX('+off.toFixed(1)+'px)';}
 
 /* ===== tooltip ===== */
-function showTip(e,sec){const i=S.cur,m=metrics(sec,i),q=quad(m.x,m.y);
+function showTip(e,sec){const i=S.cur,m=metrics(sec,i),mb=(S.scale===2)?marketBarAt(i):0,xq=(S.scale===2)?m.x/sigma(sec)-mb:m.x,q=quad(xq,m.y);
   const tip=document.getElementById('tip'),wrap=document.getElementById('stage').getBoundingClientRect();
   tip.style.display='block';
   tip.innerHTML=`<b>${sec.sector}</b>
@@ -709,6 +718,7 @@ function showTip(e,sec){const i=S.cur,m=metrics(sec,i),q=quad(m.x,m.y);
    <div class="l"><span>近20日累計</span><span style="color:${m.sz>=0?'var(--in)':'var(--out)'}">${fmt(m.sz)} 億</span></div>
    <div class="l"><span>動能(力道變化)</span><span style="color:${m.y>=0?'var(--in)':'var(--out)'}">${fmt(m.y)} 億/天</span></div>
    ${S.norm?`<div class="l"><span>相對強度</span><span>${fmt(m.x/sigma(sec))} σ</span></div>`:''}
+   ${S.scale===2?`<div class="l"><span>市場相對</span><span style="color:${xq>=0?'var(--in)':'var(--out)'}">${fmt(xq)} σ</span></div>`:''}
    <div class="l"><span>象限</span><span>${QNAME[q]}（${QORI[q]}）</span></div>
    ${sec.note?`<div class="l" style="color:#caa84a;font-size:.92em"><span>⚠️ 注意</span><span style="max-width:170px;text-align:right">${sec.note}</span></div>`:''}
    <div class="l" style="color:var(--accent)"><span>點擊</span><span>${S.pinned.has(sec.sector)?'取消K線':(sec.dim==='ai'?'看成員K線':'加入K線')}</span></div>`;
@@ -896,8 +906,8 @@ function switchTab(t){S.tab=t;
   if(t==='heat')renderHeat();if(t==='rank')renderRank();alignQuadBar();}
 function setColor(c){S.color=c;document.getElementById('cTW').classList.toggle('on',c==='tw');document.getElementById('cUS').classList.toggle('on',c==='us');
   updateMap();updateSummary();renderKside();if(S.tab==='heat')renderHeat();if(S.tab==='rank')renderRank();}
-function setNorm(on){S.norm=!!on;
-  document.querySelectorAll('#normSel button').forEach(b=>b.classList.toggle('on',(+b.dataset.n===1)===S.norm));
+function setScale(n){S.scale=n;S.norm=n>=1;
+  document.querySelectorAll('#normSel button').forEach(b=>b.classList.toggle('on',+b.dataset.n===n));
   computeDomain();buildMap();setPos(S.pos);if(S.tab==='rank')renderRank();alignQuadBar();}
 /* 若當前維度尚無任何釘選，預設釘選近20日資金量前三大（讓切換後不會空白） */
 function autoPinTop3(){const cur=curSectors();if(cur.some(s=>S.pinned.has(s.sector)))return;
@@ -938,11 +948,12 @@ function closeModal(id){document.getElementById(id).classList.remove('show');}
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('show');}));
 
 /* ===== persistence (記住使用者的釘選與設定) ===== */
-function saveState(){try{localStorage.setItem('tide_state',JSON.stringify({color:S.color,range:S.range,trail:S.trail,norm:S.norm,dim:S.dim,ksideW:S.ksideW,showIndex:S.showIndex,counterHi:S.counterHi,kmode:S.kmode,pinned:[...S.pinned],hidden:[...S.hidden]}));}catch(e){}}
+function saveState(){try{localStorage.setItem('tide_state',JSON.stringify({color:S.color,range:S.range,trail:S.trail,norm:S.norm,scale:S.scale,dim:S.dim,ksideW:S.ksideW,showIndex:S.showIndex,counterHi:S.counterHi,kmode:S.kmode,pinned:[...S.pinned],hidden:[...S.hidden]}));}catch(e){}}
 function loadState(){try{var j=JSON.parse(localStorage.getItem('tide_state'));if(!j)return;
   if(j.color)S.color=j.color;if(j.range)S.range=j.range;
   if(typeof j.trail==='number')S.trail=j.trail;
   if(typeof j.norm==='boolean')S.norm=j.norm;
+  if(typeof j.scale==='number')S.scale=j.scale; else S.scale=S.norm?1:0;   /* 舊版只有 norm 時自動推得 scale */
   if(j.dim==='twse'||j.dim==='ai')S.dim=j.dim;
   if(typeof j.ksideW==='number')S.ksideW=j.ksideW;
   if(typeof j.showIndex==='boolean')S.showIndex=j.showIndex;
@@ -986,7 +997,7 @@ function init(){
   document.getElementById('scrub').addEventListener('input',e=>{if(S.playing)togglePlay();setPos(+e.target.value);});
   setColor(S.color);setTrail(S.trail);setLabels(true);      // 還原設定並同步按鈕狀態（標籤固定顯示）
   setRange(S.range);                                        // 設定時間軸範圍並繪製
-  setNorm(S.norm);                                          // 還原座標尺度並同步按鈕
+  setScale(S.scale);                                        // 還原座標尺度並同步按鈕（3 態）
   initSplitter();
   var vl=document.getElementById('verLbl');if(vl)vl.textContent='版本 '+APP_VER+'（更新 '+APP_DATE+'）　｜　';
   window.addEventListener('beforeunload',saveState);

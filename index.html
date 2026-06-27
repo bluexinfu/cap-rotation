@@ -193,7 +193,7 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
   padding:5px 10px;cursor:pointer;transition:.15s;border-top:3px solid var(--line);overflow:hidden}
 .qcell:hover{background:var(--panel2);transform:translateY(-1px)}
 .qcell.active{box-shadow:inset 0 0 0 1px var(--accent)}
-.qcell .ori{position:absolute;top:4px;right:7px;font-size:.5em;color:var(--muted2);font-weight:700}
+.qcell .ori{position:absolute;top:4px;right:7px;font-size:.56em;color:var(--muted);font-weight:700}
 .qcell .t{font-size:.74em;font-weight:800}
 .qcell .n{font-size:1.15em;font-weight:800;line-height:1.1}
 .qcell .d{font-size:.54em;color:var(--muted)}
@@ -253,7 +253,7 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
   /* 四象限：四顆等寬並排一行、說明小字移到下方置中 */
   .qmap .qcells{flex-wrap:wrap;gap:5px;width:100%}
   .qmap .qcell{flex:1 1 0;width:auto;min-width:0;padding:5px 4px;text-align:center}
-  .qmap .qcell .ori{display:none}
+  .qmap .qcell .ori{position:static;display:block;font-size:.6em;color:var(--muted);font-weight:700;margin-bottom:1px}
   .qmap .qcell .t{font-size:.74em} .qmap .qcell .n{font-size:1.2em} .qmap .qcell .d{font-size:.56em}
   .qmap .caphint{order:99;flex:0 0 100%;text-align:center;margin:5px 0 0;position:static}
   .sideguide{font-size:.8em}

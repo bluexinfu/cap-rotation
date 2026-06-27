@@ -61,3 +61,21 @@ jobs:
               echo "::error::推送多次仍失敗，請檢查 repo 狀態"; exit 1
             fi
           fi
+
+      # R10：避免「靜默失敗」。若 data.json 最新交易日落後過久（更新疑似停擺），
+      # 讓本次 workflow 失敗 → GitHub 會自動寄信通知 repo 擁有者（無需額外設定）。
+      # 註：採保守門檻（>4 天）以避開週末＋一般國定假日的誤報；遇農曆春節等超長連假可能誤報一次，可忽略。
+      - name: Alert if data is stale (R10)
+        run: |
+          python - <<'PY'
+          import json, datetime, sys
+          updated = json.load(open('data.json'))['updated']        # YYYYMMDD
+          d = datetime.datetime.strptime(updated, '%Y%m%d').date()
+          today = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).date()  # 台灣時間今天
+          gap = (today - d).days
+          print(f'最新交易日 {updated}，距今 {gap} 天')
+          if gap > 4:
+              print(f'::error::資料已 {gap} 天未更新（最新 {updated}）—— 更新機制可能停擺，請檢查 Actions 紀錄與資料源（TWSE/FinMind）')
+              sys.exit(1)
+          print('資料新鮮度正常')
+          PY

@@ -7,18 +7,24 @@ on:
     - cron: '30 10 * * 1-5'   # 台灣 18:30（首次：盤後法人資料通常已公布）
     - cron: '0 13 * * 1-5'    # 台灣 21:00（補抓當晚較晚才出表的日子）
     - cron: '0 23 * * 1-5'    # 隔日台灣 07:00（週五的資料若拖到隔天，週六上午補回）
-  workflow_dispatch:        # 也可在 Actions 頁手動執行
+  workflow_dispatch:          # 也可在 Actions 頁手動執行
+    inputs:
+      force_rebuild:
+        description: '全量重建（重抓整個視窗並重新挑選各板塊龍頭股）'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
 
 concurrency:
   group: update-data
-  cancel-in-progress: false
+  cancel-in-progress: true   # 增量很快；若上一個時段還卡著，直接讓新的取代，避免互相排隊堵死
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30        # 整個 job 的硬上限（保險）；正常增量只需 1~2 分
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -28,10 +34,15 @@ jobs:
         with:
           python-version: '3.11'
 
+      # 預設增量更新（只抓比 data.json 內 updated 更新的交易日）；秒~分鐘級完成，不會觸發 TWSE 限流。
+      # 加 timeout-minutes：萬一資料源異常導致卡住，20 分內快速失敗、亮紅燈，而不是默默掛到 6 小時上限。
       - name: Build data.json
+        timeout-minutes: 20
         run: python build_data.py
         env:
           NDAYS: '75'
+          # 手動觸發時可勾選全量重建（會重新挑選龍頭股）；排程一律走增量。
+          FORCE_REBUILD: ${{ github.event_name == 'workflow_dispatch' && inputs.force_rebuild && '1' || '' }}
           FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}   # TWSE T86 端點延遲時的備援來源（免費註冊取得）
 
       - name: Commit & push if changed
@@ -39,14 +50,15 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data.json
+          [ -f sector_map.json ] && git add sector_map.json || true
           if git diff --cached --quiet; then
             echo "資料無變動，略過 commit"
           else
             # commit 訊息用 data.json 內實際最新交易日，而非執行日，避免「跑了卻沒新增交易日」被誤判為已更新
             LATEST=$(python -c "import json;print(json.load(open('data.json'))['updated'])")
             git commit -m "data: update ${LATEST}"
-            # 推送前先同步雲端：建置可能耗時 20+ 分，期間若有人改了 repo（或排程撞期），
-            # 直接 push 會被拒而整批白做。改為 fetch + rebase 後再 push，並自動重試 3 次。
+            # 推送前先同步雲端：建置期間若有人改了 repo（或排程撞期），直接 push 會被拒。
+            # 改為 fetch + rebase 後再 push，並自動重試 3 次。
             BR="${GITHUB_REF_NAME:-master}"
             PUSHED=0
             for i in 1 2 3; do
@@ -62,13 +74,18 @@ jobs:
             fi
           fi
 
-      # R10：避免「靜默失敗」。若 data.json 最新交易日落後過久（更新疑似停擺），
-      # 讓本次 workflow 失敗 → GitHub 會自動寄信通知 repo 擁有者（無需額外設定）。
-      # 註：採保守門檻（>4 天）以避開週末＋一般國定假日的誤報；遇農曆春節等超長連假可能誤報一次，可忽略。
+      # R10：資料新鮮度看門狗。改用 if: always()，即使前面 build 失敗/逾時也會執行，
+      # 這樣「卡住沒更新」也會被抓到（讀現有 data.json 的 updated 來判斷）。
+      # 若 data.json 最新交易日落後過久 → 讓 workflow 失敗 → GitHub 自動寄信通知 repo 擁有者。
+      # 採保守門檻（>4 天）以避開週末＋一般國定假日的誤報；遇農曆春節等超長連假可能誤報一次，可忽略。
       - name: Alert if data is stale (R10)
+        if: always()
         run: |
           python - <<'PY'
-          import json, datetime, sys
+          import json, datetime, sys, os
+          if not os.path.exists('data.json'):
+              print('::error::找不到 data.json —— build 可能在產生檔案前就失敗，請檢查上一步紀錄')
+              sys.exit(1)
           updated = json.load(open('data.json'))['updated']        # YYYYMMDD
           d = datetime.datetime.strptime(updated, '%Y%m%d').date()
           today = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).date()  # 台灣時間今天

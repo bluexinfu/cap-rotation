@@ -5,6 +5,15 @@
 從臺灣證券交易所(TWSE)公開資料計算各產業三大法人資金流、類股指數、龍頭股 OHLC。
 只用 Python 標準庫，無第三方相依。GitHub Actions 每日收盤後執行。
 
+執行模式（2026-06-30 起）:
+  * 預設「增量更新」(run): 讀現有 data.json，只抓比 updated 新的交易日接上去、
+    丟掉最舊一天。每次只發數個請求 → 不會觸發 TWSE 限流，秒~分鐘級完成。
+  * 「全量重建」(main): 重抓整個 NDAYS 視窗。僅在以下情況觸發：
+      - 無 data.json / 資料不完整 / 落後過多（>10 交易日）
+      - 環境變數 FORCE_REBUILD=1（手動 workflow_dispatch 用）
+    全量重建會重新挑選各板塊龍頭股(rep)與產業對照；增量模式沿用既有 rep（中長期觀察
+    沿用龍頭較有連續性，需換龍頭時跑一次 FORCE_REBUILD 即可）。
+
 輸出 data.json schema:
 {
   "updated": "YYYYMMDD",
@@ -265,6 +274,241 @@ def build_ai_sectors(days, names_all):
     ai_out.sort(key=lambda o:-sum(o["series"][-20:]))
     return ai_out
 
+# ============================================================================
+#  增量更新（incremental）相關
+# ============================================================================
+DATA_PATH   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data.json")
+SECMAP_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sector_map.json")
+SECMAP_TTL_DAYS = 7   # 產業對照快取超過幾天就重建（產業歸屬鮮少變動）
+
+def _save_sector_map(m):
+    try:
+        with open(SECMAP_PATH, "w", encoding="utf-8") as f:
+            json.dump({"_built": datetime.date.today().strftime("%Y%m%d"), "map": m},
+                      f, ensure_ascii=False, separators=(",", ":"))
+    except Exception as e:
+        print(f"  （sector_map 寫入失敗，可忽略：{e}）", file=sys.stderr)
+
+def _get_sector_map(last):
+    """取得 股票->產業 對照：優先用快取（7 天內），否則用近日 T86 重建並寫快取。"""
+    try:
+        if os.path.exists(SECMAP_PATH):
+            with open(SECMAP_PATH, encoding="utf-8") as f:
+                c = json.load(f)
+            m = c.get("map") or {}
+            built = c.get("_built", "")
+            if m and built:
+                age = (datetime.date.today() -
+                       datetime.datetime.strptime(built, "%Y%m%d").date()).days
+                if age <= SECMAP_TTL_DAYS:
+                    print(f"  使用 sector_map 快取（{built}, {len(m)} 檔）", file=sys.stderr)
+                    return m
+    except Exception:
+        pass
+    cand, dd = [], last
+    while len(cand) < 8:
+        if dd.weekday() < 5:
+            cand.append(dd.strftime("%Y%m%d"))
+        dd -= datetime.timedelta(days=1)
+    print("  重建 sector_map …", file=sys.stderr)
+    m = build_stock_sector(cand)
+    if m:
+        _save_sector_map(m)
+    return m
+
+def _trading_days_between(cur_ds, last_date):
+    """回傳 cur_ds（不含）之後到 last_date（含）之間的所有平日（YYYYMMDD）。"""
+    out = []
+    try:
+        d = datetime.datetime.strptime(cur_ds, "%Y%m%d").date() + datetime.timedelta(days=1)
+    except Exception:
+        return out
+    while d <= last_date:
+        if d.weekday() < 5:
+            out.append(d.strftime("%Y%m%d"))
+        d += datetime.timedelta(days=1)
+    return out
+
+def fetch_day_bundle(ds, stock_sector):
+    """抓單一交易日所需的原始資料並算好當日貢獻。無資料（假日/未出表）回 None。"""
+    t86 = fetch_t86(ds); time.sleep(0.4)
+    if not t86 or t86.get("stat") != "OK" or not t86.get("data"):
+        return None
+    mi = parse_mi(fetch(MI_URL.format(d=ds))); time.sleep(0.4)
+    if not mi:
+        return None
+    ohlc, close, names, idx = mi
+    names_all.update(names)
+    sv = {}; mv = {}
+    for r in t86["data"]:
+        sid = r[0].strip(); val = num(r[-1]) * close.get(sid, 0)
+        sec = stock_sector.get(sid)
+        if sec: sv[sec] = sv.get(sec, 0) + val
+        if sid in AI_MEMBERS: mv[sid] = val
+    onv, _ooh, onm = fetch_otc(ds, OTC_WANT); time.sleep(0.4)
+    names_all.update(onm)
+    otc_ohlc = {}
+    if onv:
+        s = f"{ds[:4]}-{ds[4:6]}-{ds[6:8]}"
+        for sid in sorted(onv):
+            fm = fetch_finmind_ohlc(sid, s, s); time.sleep(0.4)
+            oh = fm.get(ds)
+            if oh:
+                otc_ohlc[sid] = oh
+                mv[sid] = onv[sid] * oh[3]      # 用當日收盤把「淨買股數」換算成金額
+            else:
+                mv[sid] = 0.0
+    mkt = fetch_mkt_netbuy(ds); time.sleep(0.3)
+    if not mkt and t86.get("_src") == "finmind":
+        mkt = sum(num(r[-1]) * close.get(r[0].strip(), 0) for r in t86["data"])
+    taiex = fetch_taiex_month(ds[:6] + "01")
+    mk = taiex.get(roc(ds))
+    mk_ohlc = mk if (mk and mk[3] > 0) else None
+    return {"date": ds, "sv": sv, "mv": mv, "idx": idx, "ohlc": ohlc,
+            "otc_ohlc": otc_ohlc, "mkt": mkt, "mk_ohlc": mk_ohlc}
+
+def _idx_for(sec, idx_keys):
+    if sec in idx_keys: return sec
+    c = [n for n in idx_keys if n.startswith(sec)]
+    if c: return sorted(c, key=len)[0]
+    c = [n for n in idx_keys if sec.startswith(n)]
+    if c: return sorted(c, key=len, reverse=True)[0]
+    return None
+
+def _member_ohlc_day(c, b):
+    if c in b["otc_ohlc"]:
+        return b["otc_ohlc"][c]
+    v = b["ohlc"].get(c)
+    return [v[0], v[1], v[2], v[3]] if (v and len(v) > 3 and v[3] > 0) else None
+
+def append_day(data, b):
+    """把單日 bundle b 接到既有 data 的每個陣列尾端（與全量重建的計算方式一致）。"""
+    idx_keys = set(b["idx"].keys())
+    for s in data["sectors"]:
+        if s.get("dim") == "ai":
+            members = s.get("members", [])
+            codes = [m["id"] for m in members]
+            s["series"].append(round(sum(b["mv"].get(c, 0) for c in codes) / 1e8, 2))
+            s.setdefault("idx", []).append(None)
+            for m in members:
+                m.setdefault("ohlc", []).append(_member_ohlc_day(m["id"], b))
+                m.setdefault("flow", []).append(round(b["mv"].get(m["id"], 0) / 1e8, 2))
+            s.setdefault("ohlc", []).append(members[0]["ohlc"][-1] if members else None)
+        else:
+            sec = s["sector"]
+            s["series"].append(round(b["sv"].get(sec, 0.0) / 1e8, 2))
+            ino = _idx_for(sec, idx_keys)
+            s.setdefault("idx", []).append(b["idx"].get(ino) if ino else None)
+            rep = (s.get("rep") or {}).get("id")
+            v = b["ohlc"].get(rep) if rep else None
+            s.setdefault("ohlc", []).append(
+                [v[0], v[1], v[2], v[3]] if (v and len(v) > 3 and v[3] > 0) else None)
+    mk = data.get("market") or {"name": "加權指數", "ohlc": [], "flow": []}
+    mk.setdefault("ohlc", []).append(b["mk_ohlc"])
+    mk.setdefault("flow", []).append(round((b["mkt"] or 0) / 1e8, 2))
+    data["market"] = mk
+    data.setdefault("dates", []).append(b["date"])
+    data["updated"] = b["date"]
+
+def recompute_ai_notes(data):
+    """依（已修剪的）近20日成員資金流重算 AI 主題的「偏大個股」備註。"""
+    for s in data["sectors"]:
+        if s.get("dim") != "ai":
+            continue
+        members = s.get("members", [])
+        if len(members) <= 1:
+            s["note"] = None; continue
+        contrib = {m["id"]: sum(abs(x) for x in (m.get("flow") or [])[-20:]) for m in members}
+        tot = sum(contrib.values()) or 1
+        big = max(contrib, key=contrib.get)
+        if contrib[big] / tot > BIG_SHARE:
+            bigname = next((m["name"] for m in members if m["id"] == big), big)
+            s["note"] = f"{bigname} 量級偏大（近20日約占{round(contrib[big]/tot*100)}%），看相對強度較公允"
+        else:
+            s["note"] = None
+
+def trim_all(data, n):
+    """把所有逐日陣列修剪到最後 n 天，維持與 dates 對齊。"""
+    def t(a): return a[-n:] if len(a) > n else a
+    data["dates"] = t(data.get("dates", []))
+    for s in data["sectors"]:
+        for k in ("series", "idx", "ohlc"):
+            if isinstance(s.get(k), list):
+                s[k] = t(s[k])
+        for m in s.get("members", []):
+            if isinstance(m.get("ohlc"), list): m["ohlc"] = t(m["ohlc"])
+            if isinstance(m.get("flow"), list): m["flow"] = t(m["flow"])
+    mk = data.get("market") or {}
+    for k in ("ohlc", "flow"):
+        if isinstance(mk.get(k), list):
+            mk[k] = t(mk[k])
+
+def resort_sectors(data):
+    """與全量重建相同：twse 與 ai 兩群各依近20日資金流由大到小排序，twse 在前。"""
+    secs = data.get("sectors", [])
+    tw = [s for s in secs if s.get("dim") != "ai"]
+    ai = [s for s in secs if s.get("dim") == "ai"]
+    tw.sort(key=lambda o: -sum((o.get("series") or [])[-20:]))
+    ai.sort(key=lambda o: -sum((o.get("series") or [])[-20:]))
+    data["sectors"] = tw + ai
+
+def incremental_update():
+    """增量更新主流程。成功更新回 True；無事可做回 False；需全量重建回 None。"""
+    if not os.path.exists(DATA_PATH):
+        print("無既有 data.json → 需全量重建", file=sys.stderr); return None
+    try:
+        with open(DATA_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        print(f"讀取 data.json 失敗（{e}）→ 需全量重建", file=sys.stderr); return None
+    if (not data.get("dates") or len(data["dates"]) < 2 or not data.get("sectors")):
+        print("既有資料不完整 → 需全量重建", file=sys.stderr); return None
+
+    last = latest_trading_day()
+    last_ds = last.strftime("%Y%m%d")
+    cur = str(data.get("updated", ""))
+    print(f"既有最新 {cur}，市場最新交易日 {last_ds}", file=sys.stderr)
+    if last_ds <= cur:
+        print("資料已是最新，無需更新", file=sys.stderr); return False
+    gaps = _trading_days_between(cur, last)
+    if not gaps:
+        print("無新交易日", file=sys.stderr); return False
+    if len(gaps) > 10:
+        print(f"落後 {len(gaps)} 個交易日（過多）→ 需全量重建", file=sys.stderr); return None
+
+    stock_sector = _get_sector_map(last)
+    if not stock_sector:
+        print("無法取得產業對照 → 需全量重建", file=sys.stderr); return None
+
+    appended = 0
+    for ds in gaps:
+        b = fetch_day_bundle(ds, stock_sector)
+        if not b:
+            print(f"  {ds} 無資料（假日/未出表），略過", file=sys.stderr); continue
+        append_day(data, b); appended += 1
+        print(f"  已新增 {ds}（累計新增 {appended}）", file=sys.stderr)
+    if appended == 0:
+        print("沒有可新增的交易日（可能尚未出表，留待下個時段重試）", file=sys.stderr); return False
+
+    trim_all(data, NDAYS)
+    recompute_ai_notes(data)
+    resort_sectors(data)
+    with open(DATA_PATH, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+    print(f"增量更新完成 → updated={data['updated']}，交易日 {len(data['dates'])}，本次新增 {appended} 天",
+          file=sys.stderr)
+    return True
+
+def run():
+    """進入點：預設增量更新；必要時退回全量重建。"""
+    if os.environ.get("FORCE_REBUILD") == "1":
+        print("FORCE_REBUILD=1 → 全量重建", file=sys.stderr)
+        return main()
+    res = incremental_update()
+    if res is None:        # 增量不適用 → 全量重建
+        return main()
+    # res True/False 都代表正常結束（True=有更新；False=本來就最新/尚未出表）
+
 def main():
     last = latest_trading_day()
     print("最新交易日:", last, file=sys.stderr)
@@ -275,6 +519,8 @@ def main():
             cand.append(dd.strftime("%Y%m%d"))
         dd -= datetime.timedelta(days=1)
     stock_sector = build_stock_sector(cand)
+    if stock_sector:
+        _save_sector_map(stock_sector)     # 全量重建時順手刷新產業對照快取
     print("對應股票數:", len(stock_sector),
           "| 產業數:", len(set(stock_sector.values())), file=sys.stderr)
 
@@ -383,12 +629,10 @@ def main():
 
     res={"updated":dates[-1],"dates":dates,"sectors":out+ai_out,"market":market}
 
-    here=os.path.dirname(os.path.abspath(__file__))
-    path=os.path.join(here,"data.json")
-    with open(path,"w",encoding="utf-8") as f:
+    with open(DATA_PATH,"w",encoding="utf-8") as f:
         json.dump(res,f,ensure_ascii=False,separators=(",",":"))
-    print("寫出", path, "| 交易日", len(dates), "| 產業", len(out), "| AI主題", len(ai_out), file=sys.stderr)
+    print("寫出", DATA_PATH, "| 交易日", len(dates), "| 產業", len(out), "| AI主題", len(ai_out), file=sys.stderr)
 
 names_all={}
 if __name__=="__main__":
-    main()
+    run()

@@ -213,6 +213,12 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
   border-bottom:1px solid var(--line);background:var(--bg2);align-items:center}
 .guidebar b{color:var(--txt)} .guidebar .sep{color:var(--muted2);margin:0 -8px}
 .guidebar .pos{color:var(--in);font-weight:700} .guidebar .neg{color:var(--out);font-weight:700}
+/* 當日變化列（B案）：檢視日 vs 前一交易日的狀態轉移紀錄（換象限/逆勢名單進出/潮汐翻轉）。純狀態陳述、非訊號 */
+.changebar{display:flex;flex-wrap:wrap;gap:3px 12px;padding:6px 16px;font-size:.75em;color:var(--txt);
+  border-bottom:1px solid var(--line);background:var(--bg2);align-items:center}
+.changebar .chgtitle{color:var(--accent);font-weight:700;cursor:pointer;user-select:none;white-space:nowrap}
+.changebar .sep{color:var(--muted2);margin:0 -6px}
+.changebar .chgnote{margin-left:auto;color:var(--muted2);font-size:.9em;white-space:nowrap}
 .guide{font-size:.92em;line-height:1.72}
 .guide h4{margin:17px 0 6px;font-size:1.02em;color:var(--accent)}
 .guide h4:first-of-type{margin-top:2px}
@@ -258,6 +264,8 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
   .qmap .caphint{order:99;flex:0 0 100%;text-align:center;margin:5px 0 0;position:static}
   .sideguide{font-size:.8em}
   .guidebar{display:none}
+  .changebar{font-size:.72em;padding:6px 12px}
+  .changebar .chgnote{display:none}
   /* 圖表卡：高度依寬度，正方形畫布剛好填滿不留白 */
   .center{order:2;flex:none}
   .chead{padding:10px 12px;gap:8px}
@@ -352,6 +360,8 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
 
             <div class="sec"><b class="h">⑥ K 線區（右側）</b>：看「價格 vs 籌碼」對照。「<b>加權指數</b>」鈕可叫出大盤基準卡；中間分隔線可拖曳調整寬度。下方時間軸可播放／逐日切換看輪動。</div>
 
+            <div class="sec"><b class="h">⑦ 當日變化列</b>：圖上方列出「檢視日 vs 前一交易日」的<b>換象限</b>板塊、<b>逆勢強勢名單進出</b>與<b>大盤潮汐翻轉</b>。這是<b>狀態紀錄、不是訊號</b>——單日象限翻轉常見（雜訊仍在），請配合軌跡與 20 日累計看趨勢。點 📋 可收合。</div>
+
             <div class="sec" style="color:var(--muted2);font-size:.92em">※ 本工具為資金流<b>觀察</b>，非選股或買賣建議。</div>
           </div></span>
           <div class="hint" id="hint">點泡泡可釘選到右側K線；按 ▶ 播放、或 ⏮⏭（←→鍵）逐日切換看輪動</div>
@@ -364,6 +374,7 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
         <span><b>顏色</b>＝5日方向（<span class="pos">●流入</span>·<span class="neg">●流出</span>·<span style="color:var(--grey)">●中性</span>，中性＝相對自身波動還不算大）</span><span class="sep">｜</span>
         <span>▶ 播放看輪動·點泡泡看K線</span>
       </div>
+      <div class="changebar" id="changebar"></div>
       <div class="qmap" id="qmap"></div>
       <div class="stage" id="stage">
         <svg class="chart" id="svg" viewBox="0 0 1000 620" preserveAspectRatio="xMidYMid meet"></svg>
@@ -558,7 +569,7 @@ function setDims(){
 const WIN=5,BASE=5,CUM=20,I0=WIN+BASE-1,EMA_SPAN=3;
 const APP_VER='v0.4.0',APP_DATE='2026-06-27';   // 版本資訊（顯示於工具列＋頁尾、可點開更新紀錄 mLog）；發版時更新
 const S={tab:'map',color:'tw',trail:6,labels:true,search:'',hidden:new Set(),pinned:new Set(),
-  range:40, kmode:{}, cur:0,pos:0, playing:false,spd:1.4,raf:null,lastT:null, qfilter:null, norm:false, scale:0, dim:'twse', ksideW:0, showIndex:false, counterHi:true};
+  range:40, kmode:{}, cur:0,pos:0, playing:false,spd:1.4,raf:null,lastT:null, qfilter:null, norm:false, scale:0, dim:'twse', ksideW:0, showIndex:false, counterHi:true, chgOpen:true};
 const QNAME={chao:'漲潮',lun:'輪動',guan:'觀望',tui:'退潮'};
 const QORI={chao:'右上',lun:'右下',guan:'左上',tui:'左下'};
 let SECID={};
@@ -606,6 +617,33 @@ function counterTops(pos){const f=Math.floor(pos),tide=marketRoll5(f);
     if(isCounter(m,tide)&&rel>=COUNTER_MIN_SIGMA)cand.push({name:sec.sector,str:rel});});
   cand.sort((a,b)=>b.str-a.str);
   return cand.slice(0,COUNTER_TOPN).map(c=>c.name);}
+
+/* ===== 當日變化列（B案）：檢視日 vs 前一交易日的狀態轉移「紀錄」。
+   紅線提醒：只陳述事實（誰換了象限、名單誰進誰出），不加任何建議動詞、不排序、不過濾。
+   象限歸屬用板塊自身資金流的正負號（÷σ 不變號，故金額/相對強度兩模式結果一致），
+   不隨「市場相對」座標位移——與四象限統計卡（snapshot）同一口徑，避免切座標時紀錄跳動。 */
+function quadRawAt(sec,j){const m=metrics(sec,j);return quad(m.x,m.y);}
+/* 連續停留天數：從第 i 天往回數同象限的天數（含當天；最遠回溯到 I0，象限自該日起才有定義） */
+function qStreak(sec,i){const q0=quadRawAt(sec,i);let n=1;for(let j=i-1;j>=I0;j--){if(quadRawAt(sec,j)!==q0)break;n++;}return n;}
+const QCOL={chao:'var(--in)',lun:'var(--neu)',guan:'var(--grey)',tui:'var(--out)'};
+function toggleChanges(){S.chgOpen=!S.chgOpen;renderChanges(S.cur);saveState();}
+function renderChanges(i){var el=document.getElementById('changebar');if(!el)return;
+  var head='<span class="chgtitle" onclick="toggleChanges()" title="檢視日 vs 前一交易日的狀態變化（點擊收合/展開）">📋 當日變化 '+(S.chgOpen?'▾':'▸')+'</span>';
+  if(!S.chgOpen){el.innerHTML=head;return;}
+  if(i-1<I0){el.innerHTML=head+'<span class="muted">資料起始日，無前一日可比</span>';return;}
+  var items=[];
+  var t0=marketRoll5(i-1),t1=marketRoll5(i);
+  if(t0!=null&&t1!=null&&(t0<0)!==(t1<0))
+    items.push('<span>🌊 大盤 '+(t0<0?'退潮':'漲潮')+'→<b style="color:'+(t1<0?'var(--out)':'var(--in)')+'">'+(t1<0?'退潮':'漲潮')+'</b></span>');
+  curSectors().forEach(function(sec){if(S.hidden.has(sec.sector))return;
+    var a=quadRawAt(sec,i-1),b=quadRawAt(sec,i);
+    if(a!==b)items.push('<span><b>'+sec.sector+'</b> <span class="muted">'+QNAME[a]+'</span>→<b style="color:'+QCOL[b]+'">'+QNAME[b]+'（'+QORI[b]+'）</b></span>');});
+  if(S.counterHi){var p=new Set(counterTops(i-1)),c=counterTops(i),cs=new Set(c),io=[];
+    c.forEach(function(n){if(!p.has(n))io.push('<b style="color:#ffd24a">＋'+n+'</b>');});
+    p.forEach(function(n){if(!cs.has(n))io.push('<span class="muted">－'+n+'</span>');});
+    if(io.length)items.push('<span>🌊 逆勢強勢 '+io.join(' ')+'</span>');}
+  el.innerHTML=head+(items.length?items.join('<span class="sep">｜</span>'):'<span class="muted">無象限變化</span>')
+    +'<span class="chgnote">狀態紀錄非訊號 · 單日翻轉常見，配合軌跡看趨勢</span>';}
 
 /* ===== scales ===== */
 let LTX=5,LTY=1;
@@ -721,6 +759,7 @@ function updateSummary(){const i=S.cur,snap=snapshot(i).filter(s=>!S.hidden.has(
   const defs=[['chao','漲潮⭐','右上','加速流入'],['lun','輪動','右下','流入但放緩'],['tui','退潮','左下','流出加速'],['guan','觀望','左上','流出趨緩']];
   document.getElementById('qmap').innerHTML='<div class="qcells"><span class="caphint">四象限<br>點一下篩選</span>'+defs.map(([k,t,ori,dd])=>
     `<div class="qcell ${k} ${S.qfilter===k?'active':''}" onclick="filterQuad('${k}')"><span class="ori">${ori}</span><div class="t">${t}</div><div class="n">${c[k]}</div><div class="d">${dd}</div></div>`).join('')+'</div>';
+  renderChanges(i);
   alignQuadBar();}
 /* 把四象限「按鈕」水平對齊圖表的垂直零線（X=0，即 Y 軸）。零線位置會隨資料/範圍/K線寬度變動，
    用 SVG 內建 getScreenCTM() 精準換算（含 viewBox 縮放與 meet 置中留白）。說明小字隨群組移動但不算進對齊中心。 */
@@ -749,6 +788,7 @@ function showTip(e,sec){const i=S.cur,m=metrics(sec,i),mb=(S.scale===2)?marketBa
    ${S.norm?`<div class="l"><span>相對強度</span><span>${fmt(m.x/sigma(sec))} σ</span></div>`:''}
    ${S.scale===2?`<div class="l"><span>市場相對</span><span style="color:${xq>=0?'var(--in)':'var(--out)'}">${fmt(xq)} σ</span></div>`:''}
    <div class="l"><span>象限</span><span>${QNAME[q]}（${QORI[q]}）</span></div>
+   ${(S.scale!==2||q===quad(m.x,m.y))?`<div class="l"><span>連續停留</span><span>第 ${qStreak(sec,i)} 天</span></div>`:''}
    ${sec.note?`<div class="l" style="color:#caa84a;font-size:.92em"><span>⚠️ 注意</span><span style="max-width:170px;text-align:right">${sec.note}</span></div>`:''}
    <div class="l" style="color:var(--accent)"><span>點擊</span><span>${S.pinned.has(sec.sector)?'取消K線':(sec.dim==='ai'?'看成員K線':'加入K線')}</span></div>`;
   let x=e.clientX-wrap.left+14,y=e.clientY-wrap.top+14;
@@ -910,12 +950,13 @@ function renderHeat(){const ws=winStart(),we=LAST();const dts=DATA.dates.slice(w
 /* ===== ranking ===== */
 let sortKey='x',sortDir=-1;
 function renderRank(){const i=S.cur,snap=snapshot(i).filter(s=>!S.hidden.has(s.sector));
+  snap.forEach(s=>s.qd=qStreak(s.sec,i));   /* 連續停留天數（B案）：分辨「剛進象限」vs「待了很久」的輪動節奏 */
   snap.sort((a,b)=>sortDir*(a[sortKey]-b[sortKey]));
-  const cols=[['sector','板塊'],['x','近5日日均(平滑)'],['sz','近20日(億)'],['y','動能'],['q','象限']];
+  const cols=[['sector','板塊'],['x','近5日日均(平滑)'],['sz','近20日(億)'],['y','動能'],['q','象限'],['qd','連續天數']];
   let h='<thead><tr>';cols.forEach(([k,t])=>h+=`<th class="${k===sortKey?'sorted':''}" onclick="setSort('${k}')">${t}</th>`);h+='</tr></thead><tbody>';
   snap.forEach(s=>{const c=col(s.x,s.sec);h+=`<tr onclick="togglePin('${s.sector}')"><td><span class="dotc" style="background:${c.f}"></span>${s.sector}${S.pinned.has(s.sector)?' 📌':''}</td>
     <td class="${s.x>=0?'pos':'neg'}">${fmt(s.x)}</td><td class="${s.sz>=0?'pos':'neg'}">${fmt(s.sz)}</td>
-    <td class="${s.y>=0?'pos':'neg'}">${fmt(s.y)}</td><td>${QNAME[s.q]}</td></tr>`;});
+    <td class="${s.y>=0?'pos':'neg'}">${fmt(s.y)}</td><td>${QNAME[s.q]}</td><td>${s.qd} 天</td></tr>`;});
   h+='</tbody>';document.getElementById('rank').innerHTML=h;}
 function setSort(k){if(k==='q')return;if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=-1;}renderRank();}
 
@@ -977,7 +1018,7 @@ function closeModal(id){document.getElementById(id).classList.remove('show');}
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('show');}));
 
 /* ===== persistence (記住使用者的釘選與設定) ===== */
-function saveState(){try{localStorage.setItem('tide_state',JSON.stringify({color:S.color,range:S.range,trail:S.trail,norm:S.norm,scale:S.scale,dim:S.dim,ksideW:S.ksideW,showIndex:S.showIndex,counterHi:S.counterHi,kmode:S.kmode,pinned:[...S.pinned],hidden:[...S.hidden]}));}catch(e){}}
+function saveState(){try{localStorage.setItem('tide_state',JSON.stringify({color:S.color,range:S.range,trail:S.trail,norm:S.norm,scale:S.scale,dim:S.dim,ksideW:S.ksideW,showIndex:S.showIndex,counterHi:S.counterHi,chgOpen:S.chgOpen,kmode:S.kmode,pinned:[...S.pinned],hidden:[...S.hidden]}));}catch(e){}}
 function loadState(){try{var j=JSON.parse(localStorage.getItem('tide_state'));if(!j)return;
   if(j.color)S.color=j.color;if(j.range)S.range=j.range;
   if(typeof j.trail==='number')S.trail=j.trail;
@@ -987,6 +1028,7 @@ function loadState(){try{var j=JSON.parse(localStorage.getItem('tide_state'));if
   if(typeof j.ksideW==='number')S.ksideW=j.ksideW;
   if(typeof j.showIndex==='boolean')S.showIndex=j.showIndex;
   if(typeof j.counterHi==='boolean')S.counterHi=j.counterHi;
+  if(typeof j.chgOpen==='boolean')S.chgOpen=j.chgOpen;
   if(j.kmode)S.kmode=j.kmode;
   if(Array.isArray(j.pinned))S.pinned=new Set(j.pinned);
   if(Array.isArray(j.hidden))S.hidden=new Set(j.hidden);}catch(e){}}

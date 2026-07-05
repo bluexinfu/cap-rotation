@@ -149,7 +149,7 @@ def t86_cols(t86):
     - FinMind 備援：用其自帶 _cols。
     找不到時 tot 退回 -1（最後一欄，與舊版相容）、fi/it 回 None（該分項安全降級為 0）。"""
     if t86.get("_cols"):
-        c = t86["_cols"]; return c["tot"], c["fi"], c["it"]
+        c = t86["_cols"]; return c["tot"], c["fi"], c["it"], c.get("nf")
     f = [str(x) for x in (t86.get("fields") or [])]
     su = [i for i, n in enumerate(f) if "買賣超" in n]
     fi = [i for i in su if ("外資" in f[i] or "外陸資" in f[i] or "陸資" in f[i])]
@@ -157,15 +157,21 @@ def t86_cols(t86):
     if split: fi = split
     it = [i for i in su if "投信" in f[i]]
     tot = [i for i in su if "三大法人" in f[i]]
-    return (tot[0] if tot else -1), (fi or None), (it[0] if it else None)
+    return (tot[0] if tot else -1), (fi or None), (it[0] if it else None), (len(f) or None)
 
 def row_vals(r, cols):
-    """依 t86_cols 的索引取出單列的（合計, 外資, 投信）淨買股數。"""
-    tot_i, fi_is, it_i = cols
-    tot = num(r[tot_i])
-    fi = sum(num(r[i]) for i in fi_is) if fi_is else 0.0
-    it = num(r[it_i]) if it_i is not None else 0.0
-    return tot, fi, it
+    """依 t86_cols 的索引取出單列的（合計, 外資, 投信）淨買股數。
+    防衛：實際列長與 fields 欄位數不符（T86 偶有短列）時，退回舊行為
+    （最後一欄＝三大法人合計、分項略過為 0），確保永不 IndexError。"""
+    tot_i, fi_is, it_i, nf = cols
+    n = len(r)
+    if not n:
+        return 0.0, 0.0, 0.0
+    if (nf and n != nf) or tot_i is None or tot_i == -1 or tot_i >= n:
+        return num(r[-1]), 0.0, 0.0
+    fi = sum(num(r[i]) for i in fi_is if i < n) if fi_is else 0.0
+    it = num(r[it_i]) if (it_i is not None and it_i < n) else 0.0
+    return num(r[tot_i]), fi, it
 
 def fetch_t86_finmind(ds):
     """TWSE T86 端點延遲/缺資料時的備援。
@@ -197,7 +203,7 @@ def fetch_t86_finmind(ds):
         return None
     rows = [[sid, "", v[0], v[1], v[2]] for sid, v in agg.items()]
     return {"stat": "OK", "data": rows, "_src": "finmind",
-            "_cols": {"tot": 2, "fi": [3], "it": 4}}
+            "_cols": {"tot": 2, "fi": [3], "it": 4, "nf": 5}}
 
 def fetch_t86(ds):
     """取某日 T86（三大法人）：先用 TWSE 官方端點，缺資料時改用 FinMind 備援。

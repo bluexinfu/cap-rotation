@@ -369,6 +369,8 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
 
             <div class="sec"><b class="h">⑧ 法人別切換（合計/外資/投信）</b>：預設看<b>三大法人合計</b>；切「<b>外資</b>」（外陸資＋外資自營商）或「<b>投信</b>」後，整張圖改用該法人別的資金流重算（含 σ 門檻與大盤潮汐，各用自己的尺）。<b>為什麼要拆</b>：合計會互相抵銷——外資賣、投信買的「分歧日」在合計裡是中性灰，拆開才看得到。注意：<b>逆勢強勢</b>高亮只在「合計」模式運作；右側 K 線的成員資金流疊加仍為合計。自營商（含避險）不獨立成列、只在合計內。</div>
 
+            <div class="sec"><b class="h">⑨ 量價背離標記 ⇄（預設關閉，設定開啟）</b>：自動標出「資金流」與「類股指數」<b>不同步</b>的板塊——「<b>資金進、價未跟</b>」（資金 ≥ +1σ 而指數近5日沒漲）或「<b>價漲、資金退</b>」（指數明顯上漲而資金 ≤ −1σ）。<b>這只是「兩條線不同步」的事實</b>，成因多種（吸籌/出貨/產業事件/雜訊），⇄ 不是多空判斷、更不是買賣點。門檻沿用全站 1σ 口徑；僅證交所產業維度；法人資料 T+1 落後，「價未跟」可能隔天就跟上。詳見 ADR-0011。</div>
+
             <div class="sec" style="color:var(--muted2);font-size:.92em">※ 本工具為資金流<b>觀察</b>，非選股或買賣建議。</div>
           </div></span>
           <div class="hint" id="hint">點泡泡可釘選到右側K線；按 ▶ 播放、或 ⏮⏭（←→鍵）逐日切換看輪動</div>
@@ -537,6 +539,9 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
   <div class="setrow"><div class="lab">字級</div>
     <div class="opt"><button id="fN" class="on" onclick="setFont(1)">一般</button>
       <button id="fB" onclick="setFont(1.16)">放大</button></div></div>
+  <div class="setrow"><div class="lab">量價背離標記 ⇄（僅證交所產業維度；只標「資金與價格不同步」的事實，非多空訊號，詳ⓘ說明⑨）</div>
+    <div class="opt"><button id="dvOff" class="on" onclick="setDiv(false)">關閉</button>
+      <button id="dvOn" onclick="setDiv(true)">開啟</button></div></div>
   <div class="setrow"><div class="lab">軌跡長度（天）</div>
     <div class="opt" id="trailOpt"><button data-t="0" onclick="setTrail(0)">關閉</button>
       <button data-t="6" class="on" onclick="setTrail(6)">6 天</button>
@@ -576,7 +581,7 @@ function setDims(){
 const WIN=5,BASE=5,CUM=20,I0=WIN+BASE-1,EMA_SPAN=3;
 const APP_VER='v0.4.0',APP_DATE='2026-06-27';   // 版本資訊（顯示於工具列＋頁尾、可點開更新紀錄 mLog）；發版時更新
 const S={tab:'map',color:'tw',trail:6,labels:true,search:'',hidden:new Set(),pinned:new Set(),
-  range:40, kmode:{}, cur:0,pos:0, playing:false,spd:1.4,raf:null,lastT:null, qfilter:null, norm:false, scale:0, dim:'twse', ksideW:0, showIndex:false, counterHi:true, chgOpen:true, inst:0};
+  range:40, kmode:{}, cur:0,pos:0, playing:false,spd:1.4,raf:null,lastT:null, qfilter:null, norm:false, scale:0, dim:'twse', ksideW:0, showIndex:false, counterHi:true, chgOpen:true, inst:0, divMark:false};
 const QNAME={chao:'漲潮',lun:'輪動',guan:'觀望',tui:'退潮'};
 const QORI={chao:'右上',lun:'右下',guan:'左上',tui:'左下'};
 let SECID={};
@@ -663,6 +668,28 @@ function renderChanges(i){var el=document.getElementById('changebar');if(!el)ret
   el.innerHTML=head+(items.length?items.join('<span class="sep">｜</span>'):'<span class="muted">無象限變化</span>')
     +'<span class="chgnote">狀態紀錄非訊號 · 單日翻轉常見，配合軌跡看趨勢</span>';}
 
+/* ===== 量價背離觀察標記（C案/R9，ADR-0011）=====
+   只標「資金流與類股指數兩條線不同步」這個事實，不做多空解讀（紅線見 ADR-0011）。
+   兩種狀態（皆用 1σ 口徑，與 ADR-0008 一致，不另設敏感門檻）：
+     1 資金進價未跟：資金相對強度 ≥ +1σ 且 類股指數近5日報酬 ≤ 0
+     2 價漲資金退：類股指數近5日報酬 ≥ +1 個自身5日報酬σ 且 資金相對強度 ≤ −1σ
+   僅證交所產業維度（AI 主題無類股指數）；預設關閉（設定開啟）；資金端隨法人別檢視。 */
+function idxAt(sec,i){if(!sec.idx)return null;for(let j=i;j>=Math.max(0,i-3);j--){if(sec.idx[j]!=null)return sec.idx[j];}return null;}
+function pxRet5(sec,i){const a=idxAt(sec,i),b=idxAt(sec,i-WIN);return(a!=null&&b!=null&&b>0)?(a-b)/b:null;}
+function pxSig(sec){if(sec._pxsig==null){const rs=[];for(let i=I0;i<(sec.idx?sec.idx.length:0);i++){const r=pxRet5(sec,i);if(r!=null)rs.push(r);}
+  if(!rs.length){sec._pxsig=0;return 0;}
+  let m=0;for(const v of rs)m+=v;m/=rs.length;let q=0;for(const v of rs)q+=(v-m)*(v-m);sec._pxsig=Math.sqrt(q/rs.length)||0;}
+  return sec._pxsig;}
+/* 回傳 0=無 / 1=資金進價未跟 / 2=價漲資金退 */
+function divergence(sec,i){if(!S.divMark||S.dim!=='twse'||(sec.dim||'twse')!=='twse')return 0;
+  const r=pxRet5(sec,i);if(r==null)return 0;
+  const rel=metrics(sec,i).x/sigma(sec);
+  if(rel>=1&&r<=0)return 1;
+  const ps=pxSig(sec);
+  if(ps>0&&r>=ps&&rel<=-1)return 2;
+  return 0;}
+const DIVNAME={1:'資金進、價未跟',2:'價漲、資金退'};
+
 /* ===== scales ===== */
 let LTX=5,LTY=1;
 const txf=v=>Math.sign(v)*Math.log10(1+Math.abs(v)/LTX);
@@ -747,12 +774,13 @@ function updateMapAt(pos){const qf=S.qfilter,f=Math.floor(pos);
     n.dot.setAttribute('fill',c.f);n.dot.setAttribute('fill-opacity','0.85');n.dot.setAttribute('stroke',c.s);n.dot.setAttribute('stroke-width','1.6');
     const star=(q==='chao'&&m.x>20)?' ⭐':'';
     const cmk=ctr?' 🌊':'';
+    const dmk=divergence(sec,f)?' ⇄':'';   /* C案/R9：量價不同步事實標記（中性、非多空），詳 ADR-0011 */
     const mob=isMobile();
-    // 手機為避免中央小板塊標籤重疊：只標示已釘選、明顯流入/流出、或泡泡較大者（逆勢強勢一律標示）
-    const showLab=S.labels && (ctr || !mob || S.pinned.has(sec.sector) || Math.abs(m.x)>=15 || r>=34);
+    // 手機為避免中央小板塊標籤重疊：只標示已釘選、明顯流入/流出、或泡泡較大者（逆勢強勢/背離一律標示）
+    const showLab=S.labels && (ctr || !!dmk || !mob || S.pinned.has(sec.sector) || Math.abs(m.x)>=15 || r>=34);
     n.lab.setAttribute('x',X);n.lab.setAttribute('y',mob?Y+r*0.32:Y-1);
     n.lab.setAttribute('font-size',mob?Math.max(21,r*0.5):Math.max(9,r*0.4));
-    n.lab.textContent=showLab?sec.sector+star+cmk:'';
+    n.lab.textContent=showLab?sec.sector+star+cmk+dmk:'';
     n.val.setAttribute('x',X);n.val.setAttribute('y',Y+r*0.46+4);n.val.setAttribute('font-size',Math.max(8,r*0.32));
     n.val.textContent=(S.labels&&!mob)?fmt(xd):'';   // 手機改用點按看數值，減少擁擠
     n.g.classList.toggle('pinned',S.pinned.has(sec.sector));
@@ -807,6 +835,11 @@ function showTip(e,sec){const i=S.cur,m=metrics(sec,i),mb=(S.scale===2)?marketBa
    ${S.scale===2?`<div class="l"><span>市場相對</span><span style="color:${xq>=0?'var(--in)':'var(--out)'}">${fmt(xq)} σ</span></div>`:''}
    <div class="l"><span>象限</span><span>${QNAME[q]}（${QORI[q]}）</span></div>
    ${(S.scale!==2||q===quad(m.x,m.y))?`<div class="l"><span>連續停留</span><span>第 ${qStreak(sec,i)} 天</span></div>`:''}
+   ${(function(){const dv=divergence(sec,i);if(!dv)return '';const pr=pxRet5(sec,i);
+     return `<div class="l"><span>⇄ 量價不同步</span><span>${DIVNAME[dv]}</span></div>
+      <div class="l"><span>　資金 近5日</span><span>${fmt(m.x)} 億/天（${fmt(m.x/sigma(sec))}σ）</span></div>
+      <div class="l"><span>　類股指數 近5日</span><span>${pr==null?'—':(pr>=0?'+':'')+(pr*100).toFixed(1)+'%'}</span></div>
+      <div class="l" style="color:var(--muted2);font-size:.92em"><span>　成因多種</span><span>非多空判斷，請自行研究</span></div>`;})()}
    ${sec.note?`<div class="l" style="color:#caa84a;font-size:.92em"><span>⚠️ 注意</span><span style="max-width:170px;text-align:right">${sec.note}</span></div>`:''}
    <div class="l" style="color:var(--accent)"><span>點擊</span><span>${S.pinned.has(sec.sector)?'取消K線':(sec.dim==='ai'?'看成員K線':'加入K線')}</span></div>`;
   let x=e.clientX-wrap.left+14,y=e.clientY-wrap.top+14;
@@ -1031,6 +1064,8 @@ function updateKsideText(){var t=document.getElementById('ksideTitle'),d=documen
   }}
 function setFont(f){document.documentElement.style.setProperty('--fs',f);document.getElementById('fN').classList.toggle('on',f===1);document.getElementById('fB').classList.toggle('on',f!==1);}
 function setTrail(t){S.trail=t;document.querySelectorAll('#trailOpt button').forEach(b=>b.classList.toggle('on',+b.dataset.t===t));updateMap();}
+function setDiv(on){S.divMark=!!on;var a=document.getElementById('dvOn'),b=document.getElementById('dvOff');
+  if(a)a.classList.toggle('on',S.divMark);if(b)b.classList.toggle('on',!S.divMark);updateMap();saveState();}
 function setLabels(on){S.labels=on;const a=document.getElementById('lbOn'),b=document.getElementById('lbOff');if(a)a.classList.toggle('on',on);if(b)b.classList.toggle('on',!on);updateMap();}
 function renderToggles(){document.getElementById('toggleList').innerHTML=curSectors().map(s=>
   `<label><input type="checkbox" ${S.hidden.has(s.sector)?'':'checked'} onchange="toggleSec('${s.sector}',this.checked)">${s.sector}</label>`).join('');}
@@ -1045,7 +1080,7 @@ function closeModal(id){document.getElementById(id).classList.remove('show');}
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('show');}));
 
 /* ===== persistence (記住使用者的釘選與設定) ===== */
-function saveState(){try{localStorage.setItem('tide_state',JSON.stringify({color:S.color,range:S.range,trail:S.trail,norm:S.norm,scale:S.scale,dim:S.dim,ksideW:S.ksideW,showIndex:S.showIndex,counterHi:S.counterHi,chgOpen:S.chgOpen,inst:S.inst,kmode:S.kmode,pinned:[...S.pinned],hidden:[...S.hidden]}));}catch(e){}}
+function saveState(){try{localStorage.setItem('tide_state',JSON.stringify({color:S.color,range:S.range,trail:S.trail,norm:S.norm,scale:S.scale,dim:S.dim,ksideW:S.ksideW,showIndex:S.showIndex,counterHi:S.counterHi,chgOpen:S.chgOpen,inst:S.inst,divMark:S.divMark,kmode:S.kmode,pinned:[...S.pinned],hidden:[...S.hidden]}));}catch(e){}}
 function loadState(){try{var j=JSON.parse(localStorage.getItem('tide_state'));if(!j)return;
   if(j.color)S.color=j.color;if(j.range)S.range=j.range;
   if(typeof j.trail==='number')S.trail=j.trail;
@@ -1057,6 +1092,7 @@ function loadState(){try{var j=JSON.parse(localStorage.getItem('tide_state'));if
   if(typeof j.counterHi==='boolean')S.counterHi=j.counterHi;
   if(typeof j.chgOpen==='boolean')S.chgOpen=j.chgOpen;
   if(j.inst===0||j.inst===1||j.inst===2)S.inst=j.inst;
+  if(typeof j.divMark==='boolean')S.divMark=j.divMark;
   if(j.kmode)S.kmode=j.kmode;
   if(Array.isArray(j.pinned))S.pinned=new Set(j.pinned);
   if(Array.isArray(j.hidden))S.hidden=new Set(j.hidden);}catch(e){}}
@@ -1095,7 +1131,7 @@ function init(){
     else if(e.key==='ArrowRight'){stepDay(1);e.preventDefault();}
     else if(e.key===' '){togglePlay();e.preventDefault();}});
   document.getElementById('scrub').addEventListener('input',e=>{if(S.playing)togglePlay();setPos(+e.target.value);});
-  setColor(S.color);setTrail(S.trail);setLabels(true);      // 還原設定並同步按鈕狀態（標籤固定顯示）
+  setColor(S.color);setTrail(S.trail);setLabels(true);setDiv(S.divMark);      // 還原設定並同步按鈕狀態（標籤固定顯示）
   setRange(S.range);                                        // 設定時間軸範圍並繪製
   setScale(S.scale);                                        // 還原座標尺度並同步按鈕（3 態）
   initSplitter();

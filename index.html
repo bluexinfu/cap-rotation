@@ -509,7 +509,14 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
   <button class="x" onclick="closeModal('mLog')">×</button>
   <h3>📋 更新紀錄</h3>
   <div class="guide">
-    <p><b style="color:var(--accent)">v0.4.0</b> <span class="note">· 2026-06-27</span></p>
+    <p><b style="color:var(--accent)">v0.5.0</b> <span class="note">· 2026-07-06</span></p>
+    <ul>
+      <li><b>法人拆解視角</b>：新增「合計｜外資｜投信」切換，整張圖（座標/顏色/σ門檻/大盤潮汐/熱力圖/排行）改用該法人別的資金流重算——外資賣、投信買的「分歧日」在合計裡是中性灰，拆開才看得到。</li>
+      <li><b>當日變化列</b>：圖上方列出「檢視日 vs 前一交易日」的換象限板塊、逆勢強勢名單進出、大盤潮汐翻轉（狀態紀錄、非訊號）；排行榜加「連續天數」欄、泡泡資訊卡顯示「在此象限第 N 天」。</li>
+      <li><b>量價背離標記 ⇄</b>（預設關閉，設定開啟）：自動標出「資金進、價未跟」「價漲、資金退」的量價不同步事實（非多空判斷，界線見 ADR-0011）。</li>
+      <li>資料管線每日自動更新改增量（秒級完成、不再觸發限流）；修正 T86 偶發短列造成的建置失敗。</li>
+    </ul>
+    <p><b>v0.4.0</b> <span class="note">· 2026-06-27</span></p>
     <ul>
       <li><b>新增「市場相對」座標</b>：座標可切第 3 種尺度，看「撇開大盤、這板塊相對大盤是強是弱」(右＝強於大盤、左＝弱於大盤)。</li>
       <li><b>中性灰與逆勢強勢改用各板塊自身波動 σ</b>：大小板塊公平比較、畫面更穩、不再硬標弱盤裡的「矮子裡的高個」。</li>
@@ -579,7 +586,7 @@ function setDims(){
   var s=document.getElementById('svg');if(s)s.setAttribute('viewBox','0 0 '+W+' '+H);
 }
 const WIN=5,BASE=5,CUM=20,I0=WIN+BASE-1,EMA_SPAN=3;
-const APP_VER='v0.4.0',APP_DATE='2026-06-27';   // 版本資訊（顯示於工具列＋頁尾、可點開更新紀錄 mLog）；發版時更新
+const APP_VER='v0.5.0',APP_DATE='2026-07-06';   // 版本資訊（顯示於工具列＋頁尾、可點開更新紀錄 mLog）；發版時更新
 const S={tab:'map',color:'tw',trail:6,labels:true,search:'',hidden:new Set(),pinned:new Set(),
   range:40, kmode:{}, cur:0,pos:0, playing:false,spd:1.4,raf:null,lastT:null, qfilter:null, norm:false, scale:0, dim:'twse', ksideW:0, showIndex:false, counterHi:true, chgOpen:true, inst:0, divMark:false};
 const QNAME={chao:'漲潮',lun:'輪動',guan:'觀望',tui:'退潮'};

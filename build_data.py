@@ -10,9 +10,16 @@
     丟掉最舊一天。每次只發數個請求 → 不會觸發 TWSE 限流，秒~分鐘級完成。
   * 「全量重建」(main): 重抓整個 NDAYS 視窗。僅在以下情況觸發：
       - 無 data.json / 資料不完整 / 落後過多（>10 交易日）
+      - 既有資料缺「法人分項」欄位（A案 schema，2026-07 起）
       - 環境變數 FORCE_REBUILD=1（手動 workflow_dispatch 用）
     全量重建會重新挑選各板塊龍頭股(rep)與產業對照；增量模式沿用既有 rep（中長期觀察
     沿用龍頭較有連續性，需換龍頭時跑一次 FORCE_REBUILD 即可）。
+
+法人分項（A案，2026-07 起）:
+  除「三大法人合計」外，另存「外資」（外陸資＋外資自營商）與「投信」兩條分項序列，
+  供前端切換觀察（合計會互相抵銷——外資賣、投信買的分歧日反而最值得注意）。
+  自營商不獨立成列（含避險部位、雜訊高），仍隱含在合計內。
+  欄位一律用資料源的 fields 名稱定位，不寫死索引。
 
 輸出 data.json schema:
 {
@@ -22,18 +29,23 @@
     {"sector":"半導體",
      "dim":"twse",                              # twse=證交所產業 / ai=AI 主題
      "series":[float,...],                      # 各日三大法人淨買超(億元)
+     "series_fi":[float,...],                   # 各日外資淨買超(億元)＝外陸資＋外資自營商
+     "series_it":[float,...],                   # 各日投信淨買超(億元)
      "idx":[float|null,...],                    # 類股指數收盤(AI 主題為 null)
      "rep":{"id":"2330","name":"台積電"},        # 區間成交金額最大之龍頭股
      "ohlc":[[o,h,l,c]|null,...]},              # 龍頭股每日 OHLC
     {"sector":"散熱/液冷","dim":"ai",            # AI 主題板塊(用上市+上櫃個股按主題加總)
-     "series":[...], "idx":[null,...], "rep":{...}, "ohlc":[...],
+     "series":[...], "series_fi":[...], "series_it":[...],
+     "idx":[null,...], "rep":{...}, "ohlc":[...],
      "members":[{"id":"3017","name":"奇鋐","ohlc":[[o,h,l,c]|null,...],
-                 "flow":[float,...]}, ...],   # 成員股 OHLC + 每日法人淨買(億)，供 K 線+資金流疊加
+                 "flow":[float,...]}, ...],   # 成員股 OHLC + 每日法人淨買合計(億)，供 K 線+資金流疊加
      "note":"<偏大個股提示>"|null}
   ],
   "market": {"name":"加權指數",                 # 大盤基準（可切換顯示）
      "ohlc":[[o,h,l,c]|null,...],               # 加權指數每日 OHLC
-     "flow":[float,...]}                         # 全市場三大法人合計買賣超(億/日)
+     "flow":[float,...],                        # 全市場三大法人合計買賣超(億/日)
+     "flow_fi":[float,...],                     # 全市場外資買賣超(億/日)
+     "flow_it":[float,...]}                     # 全市場投信買賣超(億/日)
 }
 """
 import json, os, sys, time, datetime, urllib.request
@@ -50,7 +62,7 @@ TPEX_INST  = "https://www.tpex.org.tw/web/stock/3insti/daily_trade/3itrade_hedge
 TPEX_QUOTE = "https://www.tpex.org.tw/web/stock/aftertrading/daily_close_quotes/stk_quote_result.php?l=zh-tw&o=json&d={d}"
 def roc(ds):  # "20260616" -> "115/06/16"（民國年）
     return f"{int(ds[:4])-1911}/{ds[4:6]}/{ds[6:8]}"
-# 大盤（加權指數）：發行量加權股價指數歷史 OHLC（月檔）＋ 三大法人買賣金額統計（每日合計）
+# 大盤（加權指數）：發行量加權股價指數歷史 OHLC（月檔）＋ 三大法人買賣金額統計（每日合計/外資/投信）
 TAIEX_HIST = "https://www.twse.com.tw/rwd/zh/TAIEX/MI_5MINS_HIST?date={d}&response=json"
 BFI_URL    = "https://www.twse.com.tw/rwd/zh/fund/BFI82U?dayDate={d}&type=day&response=json"
 def fetch_taiex_month(yyyymm01):
@@ -61,13 +73,18 @@ def fetch_taiex_month(yyyymm01):
             out[str(r[0]).strip()] = [num(r[1]),num(r[2]),num(r[3]),num(r[4])]
     return out
 def fetch_mkt_netbuy(ds):
-    """全市場三大法人『合計』買賣差額（元）。"""
+    """全市場三大法人買賣差額（元）。
+    回傳 {"tot":合計, "fi":外資(外資及陸資＋外資自營商), "it":投信}。
+    以列名開頭比對（BFI82U 列：自營商(自行買賣)/自營商(避險)/投信/外資及陸資.../外資自營商/合計）。"""
     d = fetch(BFI_URL.format(d=ds))
+    out = {"tot": 0.0, "fi": 0.0, "it": 0.0}
     if d and d.get("stat")=="OK":
         for r in d.get("data",[]):
-            if str(r[0]).strip().startswith("合計"):
-                return num(r[-1])
-    return 0.0
+            nm = str(r[0]).strip(); v = num(r[-1])
+            if nm.startswith("合計"):   out["tot"] = v
+            elif nm.startswith("外資"): out["fi"] += v      # 外資及陸資 + 外資自營商
+            elif nm.startswith("投信"): out["it"] = v
+    return out
 # 上櫃個股歷史 OHLC：櫃買官方端點僅回最新日（不開放歷史），改用 FinMind 公開資料 API（含上市/上櫃歷史）
 FINMIND_URL = "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id={sid}&start_date={s}&end_date={e}"
 def fetch_finmind_ohlc(sid, s, e):
@@ -125,11 +142,38 @@ def num(s):
     try: return float(s)
     except: return 0.0
 
+def t86_cols(t86):
+    """定位 T86（或 FinMind 備援）每列的（三大法人合計, 外資欄位們, 投信）索引。
+    - TWSE：用 response 的 fields 名稱比對（不寫死索引）。外資＝「外陸資買賣超股數(不含外資自營商)」
+      ＋「外資自營商買賣超股數」兩欄加總；若來源只有合併欄（無「不含」拆分）則用合併欄，避免重複計算。
+    - FinMind 備援：用其自帶 _cols。
+    找不到時 tot 退回 -1（最後一欄，與舊版相容）、fi/it 回 None（該分項安全降級為 0）。"""
+    if t86.get("_cols"):
+        c = t86["_cols"]; return c["tot"], c["fi"], c["it"]
+    f = [str(x) for x in (t86.get("fields") or [])]
+    su = [i for i, n in enumerate(f) if "買賣超" in n]
+    fi = [i for i in su if ("外資" in f[i] or "外陸資" in f[i] or "陸資" in f[i])]
+    split = [i for i in fi if "不含" in f[i] or "外資自營商" in f[i]]
+    if split: fi = split
+    it = [i for i in su if "投信" in f[i]]
+    tot = [i for i in su if "三大法人" in f[i]]
+    return (tot[0] if tot else -1), (fi or None), (it[0] if it else None)
+
+def row_vals(r, cols):
+    """依 t86_cols 的索引取出單列的（合計, 外資, 投信）淨買股數。"""
+    tot_i, fi_is, it_i = cols
+    tot = num(r[tot_i])
+    fi = sum(num(r[i]) for i in fi_is) if fi_is else 0.0
+    it = num(r[it_i]) if it_i is not None else 0.0
+    return tot, fi, it
+
 def fetch_t86_finmind(ds):
     """TWSE T86 端點延遲/缺資料時的備援。
     用 FinMind 全市場三大法人資料，重建成 T86 風格 dict：
-        {"stat":"OK", "data":[[股票代號, "", 三大法人淨買股數], ...], "_src":"finmind"}
-    主程式只用每列的 r[0]（代號）與 r[-1]（淨買股數），故只需這兩個欄位對齊即可。
+        {"stat":"OK", "data":[[股票代號, "", 合計, 外資, 投信], ...],
+         "_src":"finmind", "_cols":{"tot":2,"fi":[3],"it":4}}
+    法人別歸類：name 以 Foreign 開頭（Foreign_Investor / Foreign_Dealer_Self）→ 外資；
+    Investment_Trust → 投信；其餘（Dealer_self / Dealer_Hedging）只進合計。
     需 FINMIND_TOKEN（免費註冊）才能做「全市場」查詢；無 token 或查無資料回 None。"""
     if not FINMIND_TOKEN:
         return None
@@ -138,16 +182,22 @@ def fetch_t86_finmind(ds):
     d = fetch(url)
     if not d or d.get("status") != 200 or not d.get("data"):
         return None
-    agg = {}   # 代號 -> 三大法人合計淨買股數（各法人別 buy-sell 加總）
+    agg = {}   # 代號 -> [合計, 外資, 投信] 淨買股數
     for r in d["data"]:
         sid = str(r.get("stock_id", "")).strip()
         if not sid:
             continue
-        agg[sid] = agg.get(sid, 0.0) + (num(r.get("buy")) - num(r.get("sell")))
+        net = num(r.get("buy")) - num(r.get("sell"))
+        name = str(r.get("name", ""))
+        a = agg.setdefault(sid, [0.0, 0.0, 0.0])
+        a[0] += net
+        if name.startswith("Foreign"):            a[1] += net
+        elif name.startswith("Investment_Trust"): a[2] += net
     if not agg:
         return None
-    rows = [[sid, "", v] for sid, v in agg.items()]
-    return {"stat": "OK", "data": rows, "_src": "finmind"}
+    rows = [[sid, "", v[0], v[1], v[2]] for sid, v in agg.items()]
+    return {"stat": "OK", "data": rows, "_src": "finmind",
+            "_cols": {"tot": 2, "fi": [3], "it": 4}}
 
 def fetch_t86(ds):
     """取某日 T86（三大法人）：先用 TWSE 官方端點，缺資料時改用 FinMind 備援。
@@ -205,18 +255,27 @@ def parse_mi(mi):
 
 def fetch_otc(ds, want):
     """抓上櫃當日資料，只取 want 內代號。
-    回傳 (nv{sid:三大法人買賣超股數}, oh{sid:[o,h,l,c]}, nm{sid:名稱})。"""
+    回傳 (nv{sid:[三大法人合計, 外資, 投信] 買賣超股數}, oh{sid:[o,h,l,c]}, nm{sid:名稱})。
+    外資/投信欄同樣用欄位名稱比對；優先用「不含外資自營商」拆分欄＋外資自營商欄加總。"""
     rd = roc(ds); nv={}; oh={}; nm={}
     di = fetch(TPEX_INST.format(d=rd))
     if di and str(di.get("stat","")).lower()=="ok":
         for t in di.get("tables",[]):
-            f=t.get("fields") or []
+            f=[str(x) for x in (t.get("fields") or [])]
             if "三大法人買賣超股數合計" in f:
                 ti=f.index("三大法人買賣超股數合計")
+                su=[i for i,n in enumerate(f) if "買賣超" in n]
+                fi=[i for i in su if ("外資" in f[i] or "陸資" in f[i])]
+                split=[i for i in fi if "不含" in f[i] or "外資自營商" in f[i]]
+                if split: fi=split
+                it=[i for i in su if "投信" in f[i]]
                 for r in t.get("data",[]):
                     sid=str(r[0]).strip()
                     if sid in want:
-                        nv[sid]=num(r[ti]); nm[sid]=str(r[1]).strip()
+                        nv[sid]=[num(r[ti]),
+                                 sum(num(r[j]) for j in fi) if fi else 0.0,
+                                 num(r[it[0]]) if it else 0.0]
+                        nm[sid]=str(r[1]).strip()
     dq = fetch(TPEX_QUOTE.format(d=rd))
     if dq and str(dq.get("stat","")).lower()=="ok":
         for t in dq.get("tables",[]):
@@ -245,8 +304,9 @@ def latest_trading_day():
     raise SystemExit("找不到最近交易日資料")
 
 def build_ai_sectors(days, names_all):
-    """用每日個股資料(x['mv']=成員淨買金額, x['oh']=OHLC)按 AI 主題加總，
-    產出 dim='ai' 的板塊清單：series=成員加總(億)、members=[{id,name,ohlc}]、note=偏大個股提示。"""
+    """用每日個股資料(x['mv']/=['mv_fi']/['mv_it']=成員淨買金額, x['oh']=OHLC)按 AI 主題加總，
+    產出 dim='ai' 的板塊清單：series/series_fi/series_it、members=[{id,name,ohlc,flow}]、note=偏大個股提示。
+    members 的 flow 維持三大法人合計（K 線疊加用；分項疊加 v2 再評估）。"""
     def member_ohlc(c):
         oh=[]
         for x in days:
@@ -259,6 +319,8 @@ def build_ai_sectors(days, names_all):
         series=[round(sum(x["mv"].get(c,0) for c in codes)/1e8,2) for x in days]
         if not any(abs(v)>0 for v in series):     # 完全無資料的主題略過
             continue
+        series_fi=[round(sum(x["mv_fi"].get(c,0) for c in codes)/1e8,2) for x in days]
+        series_it=[round(sum(x["mv_it"].get(c,0) for c in codes)/1e8,2) for x in days]
         members=[{"id":c,"name":names_all.get(c,c),"ohlc":member_ohlc(c),
                   "flow":[round(x["mv"].get(c,0)/1e8,2) for x in days]} for c in codes]
         note=None
@@ -268,7 +330,9 @@ def build_ai_sectors(days, names_all):
             big=max(contrib,key=contrib.get)
             if contrib[big]/tot>BIG_SHARE:
                 note=f"{names_all.get(big,big)} 量級偏大（近20日約占{round(contrib[big]/tot*100)}%），看相對強度較公允"
-        ai_out.append({"sector":theme,"dim":"ai","series":series,"idx":[None]*len(days),
+        ai_out.append({"sector":theme,"dim":"ai","series":series,
+                       "series_fi":series_fi,"series_it":series_it,
+                       "idx":[None]*len(days),
                        "rep":{"id":members[0]["id"],"name":members[0]["name"]},
                        "ohlc":members[0]["ohlc"],"members":members,"note":note})
     ai_out.sort(key=lambda o:-sum(o["series"][-20:]))
@@ -339,12 +403,19 @@ def fetch_day_bundle(ds, stock_sector):
         return None
     ohlc, close, names, idx = mi
     names_all.update(names)
-    sv = {}; mv = {}
+    cols = t86_cols(t86)
+    sv = {}; sv_fi = {}; sv_it = {}; mv = {}; mv_fi = {}; mv_it = {}
     for r in t86["data"]:
-        sid = r[0].strip(); val = num(r[-1]) * close.get(sid, 0)
+        sid = r[0].strip(); px = close.get(sid, 0)
+        tot, fi, it = row_vals(r, cols)
+        val = tot * px; vfi = fi * px; vit = it * px
         sec = stock_sector.get(sid)
-        if sec: sv[sec] = sv.get(sec, 0) + val
-        if sid in AI_MEMBERS: mv[sid] = val
+        if sec:
+            sv[sec] = sv.get(sec, 0) + val
+            sv_fi[sec] = sv_fi.get(sec, 0) + vfi
+            sv_it[sec] = sv_it.get(sec, 0) + vit
+        if sid in AI_MEMBERS:
+            mv[sid] = val; mv_fi[sid] = vfi; mv_it[sid] = vit
     onv, _ooh, onm = fetch_otc(ds, OTC_WANT); time.sleep(0.4)
     names_all.update(onm)
     otc_ohlc = {}
@@ -353,18 +424,24 @@ def fetch_day_bundle(ds, stock_sector):
         for sid in sorted(onv):
             fm = fetch_finmind_ohlc(sid, s, s); time.sleep(0.4)
             oh = fm.get(ds)
+            px = oh[3] if oh else 0
             if oh:
                 otc_ohlc[sid] = oh
-                mv[sid] = onv[sid] * oh[3]      # 用當日收盤把「淨買股數」換算成金額
-            else:
-                mv[sid] = 0.0
+            mv[sid] = onv[sid][0] * px       # 用當日收盤把「淨買股數」換算成金額
+            mv_fi[sid] = onv[sid][1] * px
+            mv_it[sid] = onv[sid][2] * px
     mkt = fetch_mkt_netbuy(ds); time.sleep(0.3)
-    if not mkt and t86.get("_src") == "finmind":
-        mkt = sum(num(r[-1]) * close.get(r[0].strip(), 0) for r in t86["data"])
+    if not mkt["tot"] and t86.get("_src") == "finmind":
+        # BFI82U 也可能與 T86 同步延遲；用全市場 Σ(淨買股數×收盤) 近似（合計/外資/投信各自加總）
+        for r in t86["data"]:
+            px = close.get(r[0].strip(), 0)
+            tot, fi, it = row_vals(r, cols)
+            mkt["tot"] += tot * px; mkt["fi"] += fi * px; mkt["it"] += it * px
     taiex = fetch_taiex_month(ds[:6] + "01")
     mk = taiex.get(roc(ds))
     mk_ohlc = mk if (mk and mk[3] > 0) else None
-    return {"date": ds, "sv": sv, "mv": mv, "idx": idx, "ohlc": ohlc,
+    return {"date": ds, "sv": sv, "sv_fi": sv_fi, "sv_it": sv_it,
+            "mv": mv, "mv_fi": mv_fi, "mv_it": mv_it, "idx": idx, "ohlc": ohlc,
             "otc_ohlc": otc_ohlc, "mkt": mkt, "mk_ohlc": mk_ohlc}
 
 def _idx_for(sec, idx_keys):
@@ -389,6 +466,8 @@ def append_day(data, b):
             members = s.get("members", [])
             codes = [m["id"] for m in members]
             s["series"].append(round(sum(b["mv"].get(c, 0) for c in codes) / 1e8, 2))
+            s.setdefault("series_fi", []).append(round(sum(b["mv_fi"].get(c, 0) for c in codes) / 1e8, 2))
+            s.setdefault("series_it", []).append(round(sum(b["mv_it"].get(c, 0) for c in codes) / 1e8, 2))
             s.setdefault("idx", []).append(None)
             for m in members:
                 m.setdefault("ohlc", []).append(_member_ohlc_day(m["id"], b))
@@ -397,6 +476,8 @@ def append_day(data, b):
         else:
             sec = s["sector"]
             s["series"].append(round(b["sv"].get(sec, 0.0) / 1e8, 2))
+            s.setdefault("series_fi", []).append(round(b["sv_fi"].get(sec, 0.0) / 1e8, 2))
+            s.setdefault("series_it", []).append(round(b["sv_it"].get(sec, 0.0) / 1e8, 2))
             ino = _idx_for(sec, idx_keys)
             s.setdefault("idx", []).append(b["idx"].get(ino) if ino else None)
             rep = (s.get("rep") or {}).get("id")
@@ -405,7 +486,9 @@ def append_day(data, b):
                 [v[0], v[1], v[2], v[3]] if (v and len(v) > 3 and v[3] > 0) else None)
     mk = data.get("market") or {"name": "加權指數", "ohlc": [], "flow": []}
     mk.setdefault("ohlc", []).append(b["mk_ohlc"])
-    mk.setdefault("flow", []).append(round((b["mkt"] or 0) / 1e8, 2))
+    mk.setdefault("flow", []).append(round((b["mkt"]["tot"] or 0) / 1e8, 2))
+    mk.setdefault("flow_fi", []).append(round((b["mkt"]["fi"] or 0) / 1e8, 2))
+    mk.setdefault("flow_it", []).append(round((b["mkt"]["it"] or 0) / 1e8, 2))
     data["market"] = mk
     data.setdefault("dates", []).append(b["date"])
     data["updated"] = b["date"]
@@ -432,14 +515,14 @@ def trim_all(data, n):
     def t(a): return a[-n:] if len(a) > n else a
     data["dates"] = t(data.get("dates", []))
     for s in data["sectors"]:
-        for k in ("series", "idx", "ohlc"):
+        for k in ("series", "series_fi", "series_it", "idx", "ohlc"):
             if isinstance(s.get(k), list):
                 s[k] = t(s[k])
         for m in s.get("members", []):
             if isinstance(m.get("ohlc"), list): m["ohlc"] = t(m["ohlc"])
             if isinstance(m.get("flow"), list): m["flow"] = t(m["flow"])
     mk = data.get("market") or {}
-    for k in ("ohlc", "flow"):
+    for k in ("ohlc", "flow", "flow_fi", "flow_it"):
         if isinstance(mk.get(k), list):
             mk[k] = t(mk[k])
 
@@ -463,6 +546,12 @@ def incremental_update():
         print(f"讀取 data.json 失敗（{e}）→ 需全量重建", file=sys.stderr); return None
     if (not data.get("dates") or len(data["dates"]) < 2 or not data.get("sectors")):
         print("既有資料不完整 → 需全量重建", file=sys.stderr); return None
+    # A案 schema：缺法人分項（外資/投信）序列的舊資料無法增量接續，需全量重建一次補齊歷史
+    n0 = len(data["dates"])
+    if (not all(isinstance(s.get("series_fi"), list) and len(s["series_fi"]) == len(s.get("series", []))
+                and isinstance(s.get("series_it"), list) for s in data["sectors"])
+            or not isinstance((data.get("market") or {}).get("flow_fi"), list)):
+        print("既有資料缺法人分項欄位（A案 schema）→ 需全量重建", file=sys.stderr); return None
 
     last = latest_trading_day()
     last_ds = last.strftime("%Y%m%d")
@@ -524,7 +613,7 @@ def main():
     print("對應股票數:", len(stock_sector),
           "| 產業數:", len(set(stock_sector.values())), file=sys.stderr)
 
-    days = []                 # [{date, sv, mv, ix, oh, mkt, otc_sh}]
+    days = []                 # [{date, sv, sv_fi, sv_it, mv, mv_fi, mv_it, ix, oh, mkt, otc_sh}]
     otc_seen = set()          # 出現過的上櫃成員代號（之後用 FinMind 補歷史 OHLC）
     d = last
     guard = 0
@@ -543,23 +632,35 @@ def main():
         if not mi:
             continue
         ohlc, close, names, idx = mi
-        sv = {}; mv = {}
+        cols = t86_cols(t86)
+        sv = {}; sv_fi = {}; sv_it = {}; mv = {}; mv_fi = {}; mv_it = {}
         for r in t86["data"]:
-            sid=r[0].strip(); val=num(r[-1])*close.get(sid,0)
+            sid=r[0].strip(); px=close.get(sid,0)
+            tot, fi, it = row_vals(r, cols)
+            val=tot*px; vfi=fi*px; vit=it*px
             sec=stock_sector.get(sid)
-            if sec: sv[sec]=sv.get(sec,0)+val
-            if sid in AI_MEMBERS: mv[sid]=val      # AI 主題成員(上市)的當日淨買金額
-        # 上櫃成員：取「當日三大法人淨買股數」（官方）；股價(收盤)與 OHLC 稍後用 FinMind 補
+            if sec:
+                sv[sec]=sv.get(sec,0)+val
+                sv_fi[sec]=sv_fi.get(sec,0)+vfi
+                sv_it[sec]=sv_it.get(sec,0)+vit
+            if sid in AI_MEMBERS:                  # AI 主題成員(上市)的當日淨買金額
+                mv[sid]=val; mv_fi[sid]=vfi; mv_it[sid]=vit
+        # 上櫃成員：取「當日三大法人淨買股數（合計/外資/投信）」（官方）；股價(收盤)與 OHLC 稍後用 FinMind 補
         onv, _ooh, onm = fetch_otc(ds, OTC_WANT)
         time.sleep(0.4)
         names_all.update(onm)
         otc_seen.update(onv.keys())
-        mkt = fetch_mkt_netbuy(ds); time.sleep(0.3)   # 大盤三大法人合計買賣差額(元)
+        mkt = fetch_mkt_netbuy(ds); time.sleep(0.3)   # 大盤三大法人買賣差額(元)：合計/外資/投信
         # 大盤合計端點(BFI82U)也可能與 T86 同步延遲；若這天走 FinMind 備援且 BFI 拿不到，
-        # 用「全市場 Σ(淨買股數×收盤)」近似三大法人合計買賣差額，避免大盤資金流當天空白。
-        if not mkt and t86.get("_src") == "finmind":
-            mkt = sum(num(r[-1]) * close.get(r[0].strip(), 0) for r in t86["data"])
-        days.append({"date":ds,"sv":sv,"mv":mv,"ix":idx,"oh":ohlc,"mkt":mkt,"otc_sh":dict(onv)})
+        # 用「全市場 Σ(淨買股數×收盤)」近似三大法人買賣差額，避免大盤資金流當天空白。
+        if not mkt["tot"] and t86.get("_src") == "finmind":
+            for r in t86["data"]:
+                px = close.get(r[0].strip(), 0)
+                tot, fi, it = row_vals(r, cols)
+                mkt["tot"] += tot*px; mkt["fi"] += fi*px; mkt["it"] += it*px
+        days.append({"date":ds,"sv":sv,"sv_fi":sv_fi,"sv_it":sv_it,
+                     "mv":mv,"mv_fi":mv_fi,"mv_it":mv_it,
+                     "ix":idx,"oh":ohlc,"mkt":mkt,"otc_sh":dict(onv)})
         names_all.update(names)
         print("  ok", ds, "累計", len(days), file=sys.stderr)
 
@@ -576,8 +677,12 @@ def main():
             for x in days:
                 oh=fm.get(x["date"])
                 if oh: x["oh"][sid]=oh
-                sh=x.get("otc_sh",{}).get(sid,0)
-                if sh: x["mv"][sid]=sh*(oh[3] if oh else 0)
+                sh=x.get("otc_sh",{}).get(sid)
+                if sh:
+                    px=(oh[3] if oh else 0)
+                    x["mv"][sid]=sh[0]*px
+                    x["mv_fi"][sid]=sh[1]*px
+                    x["mv_it"][sid]=sh[2]*px
 
     # 各股總成交金額 -> 選龍頭
     turn={}
@@ -602,6 +707,8 @@ def main():
         series=[round(x["sv"].get(sec,0.0)/1e8,2) for x in days]
         if not any(abs(v)>0 for v in series):     # 無資料產業略過
             continue
+        series_fi=[round(x["sv_fi"].get(sec,0.0)/1e8,2) for x in days]
+        series_it=[round(x["sv_it"].get(sec,0.0)/1e8,2) for x in days]
         ino=idx_for(sec)
         idx=[(x["ix"].get(ino) if ino else None) for x in days]
         cands=[s for s in sec_stocks[sec] if s in turn]
@@ -611,7 +718,8 @@ def main():
             for x in days:
                 v=x["oh"].get(rep)
                 ohlc.append([v[0],v[1],v[2],v[3]] if (v and v[3]>0) else None)
-        out.append({"sector":sec,"dim":"twse","series":series,"idx":idx,
+        out.append({"sector":sec,"dim":"twse","series":series,
+                    "series_fi":series_fi,"series_it":series_it,"idx":idx,
                     "rep":{"id":rep,"name":names_all.get(rep,"")} if rep else None,
                     "ohlc":ohlc})
     out.sort(key=lambda o:-sum(o["series"][-20:]))
@@ -619,13 +727,16 @@ def main():
     # ===== AI 主題維度（dim=ai）：用同一批個股資料按主題加總，附成員股 OHLC 與偏大備註 =====
     ai_out = build_ai_sectors(days, names_all)
 
-    # ===== 大盤（加權指數）：OHLC（月檔合併）＋ 每日三大法人合計買賣超（億） =====
+    # ===== 大盤（加權指數）：OHLC（月檔合併）＋ 每日三大法人買賣超（億：合計/外資/投信） =====
     taiex = {}
     for m in sorted({x["date"][:6]+"01" for x in days}):
         taiex.update(fetch_taiex_month(m)); time.sleep(0.3)
     mk_ohlc = [(taiex.get(roc(x["date"])) if (taiex.get(roc(x["date"])) and taiex.get(roc(x["date"]))[3]>0) else None) for x in days]
-    mk_flow = [round(x.get("mkt",0)/1e8,2) for x in days]
-    market = {"name":"加權指數","ohlc":mk_ohlc,"flow":mk_flow}
+    mk_flow    = [round(x["mkt"]["tot"]/1e8,2) for x in days]
+    mk_flow_fi = [round(x["mkt"]["fi"]/1e8,2) for x in days]
+    mk_flow_it = [round(x["mkt"]["it"]/1e8,2) for x in days]
+    market = {"name":"加權指數","ohlc":mk_ohlc,"flow":mk_flow,
+              "flow_fi":mk_flow_fi,"flow_it":mk_flow_it}
 
     res={"updated":dates[-1],"dates":dates,"sectors":out+ai_out,"market":market}
 

@@ -317,6 +317,11 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
         <button data-n="1" onclick="setScale(1)">相對強度</button>
         <button data-n="2" onclick="setScale(2)">市場相對</button>
       </div>
+      <div class="rangesel" id="instSel" title="法人別：合計＝三大法人加總；外資＝外陸資＋外資自營商；投信＝本國投信基金。合計會互相抵銷——外資賣、投信買的「分歧日」在合計裡看起來是中性灰，拆開看才看得到（觀察用，非建議）。切換後整張圖（座標/顏色/σ門檻/大盤潮汐）都改用該法人別的資金流重算">
+        <button data-i="0" class="on" onclick="setInst(0)">合計</button>
+        <button data-i="1" onclick="setInst(1)">外資</button>
+        <button data-i="2" onclick="setInst(2)">投信</button>
+      </div>
       <button class="iconbtn ctrtog" id="counterBtn" onclick="toggleCounter()" title="逆勢強勢高亮：當「大盤潮汐」退潮（全市場法人在賣）時，把仍逆勢被買、且力道還在擴大、相對強度最強的前5個板塊用金色標出——幫你找退潮中最抗跌/最強勢的標的。漲潮日不會有高亮。">🌊 逆勢強勢 <span class="swst" id="counterSw">關</span></button>
       <div class="search">🔍<input id="searchIn" placeholder="搜尋板塊…"></div>
       <span id="updLbl" class="sub" style="align-self:center"></span>
@@ -361,6 +366,8 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
             <div class="sec"><b class="h">⑥ K 線區（右側）</b>：看「價格 vs 籌碼」對照。「<b>加權指數</b>」鈕可叫出大盤基準卡；中間分隔線可拖曳調整寬度。下方時間軸可播放／逐日切換看輪動。</div>
 
             <div class="sec"><b class="h">⑦ 當日變化列</b>：圖上方列出「檢視日 vs 前一交易日」的<b>換象限</b>板塊、<b>逆勢強勢名單進出</b>與<b>大盤潮汐翻轉</b>。這是<b>狀態紀錄、不是訊號</b>——單日象限翻轉常見（雜訊仍在），請配合軌跡與 20 日累計看趨勢。點 📋 可收合。</div>
+
+            <div class="sec"><b class="h">⑧ 法人別切換（合計/外資/投信）</b>：預設看<b>三大法人合計</b>；切「<b>外資</b>」（外陸資＋外資自營商）或「<b>投信</b>」後，整張圖改用該法人別的資金流重算（含 σ 門檻與大盤潮汐，各用自己的尺）。<b>為什麼要拆</b>：合計會互相抵銷——外資賣、投信買的「分歧日」在合計裡是中性灰，拆開才看得到。注意：<b>逆勢強勢</b>高亮只在「合計」模式運作；右側 K 線的成員資金流疊加仍為合計。自營商（含避險）不獨立成列、只在合計內。</div>
 
             <div class="sec" style="color:var(--muted2);font-size:.92em">※ 本工具為資金流<b>觀察</b>，非選股或買賣建議。</div>
           </div></span>
@@ -569,7 +576,7 @@ function setDims(){
 const WIN=5,BASE=5,CUM=20,I0=WIN+BASE-1,EMA_SPAN=3;
 const APP_VER='v0.4.0',APP_DATE='2026-06-27';   // 版本資訊（顯示於工具列＋頁尾、可點開更新紀錄 mLog）；發版時更新
 const S={tab:'map',color:'tw',trail:6,labels:true,search:'',hidden:new Set(),pinned:new Set(),
-  range:40, kmode:{}, cur:0,pos:0, playing:false,spd:1.4,raf:null,lastT:null, qfilter:null, norm:false, scale:0, dim:'twse', ksideW:0, showIndex:false, counterHi:true, chgOpen:true};
+  range:40, kmode:{}, cur:0,pos:0, playing:false,spd:1.4,raf:null,lastT:null, qfilter:null, norm:false, scale:0, dim:'twse', ksideW:0, showIndex:false, counterHi:true, chgOpen:true, inst:0};
 const QNAME={chao:'漲潮',lun:'輪動',guan:'觀望',tui:'退潮'};
 const QORI={chao:'右上',lun:'右下',guan:'左上',tui:'左下'};
 let SECID={};
@@ -578,6 +585,15 @@ const LAST=()=>DATA.dates.length-1;
 const winStart=()=>Math.max(I0, LAST()-S.range+1);
 function fmtDate(d){return `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;}
 function mmdd(d){return `${d.slice(4,6)}/${d.slice(6,8)}`;}
+
+/* ===== 法人別（A案）：合計/外資/投信 三條序列切換 =====
+   序列由 build_data.py 提供（series=三大法人合計、series_fi=外資、series_it=投信）。
+   切換後整張圖（X/Y/泡泡/σ門檻/大盤潮汐/熱力圖/排行/當日變化）都改用該法人別重算；
+   K 線區成員資金流疊加維持「合計」（v1 不拆）。舊 data.json 無分項時自動隱藏切換鈕。 */
+const INSTNAME=['三大法人','外資','投信'];
+function hasInst(){return !!(DATA&&DATA.sectors&&DATA.sectors.some(s=>Array.isArray(s.series_fi)));}
+function serOf(sec){return S.inst===1?(sec.series_fi||sec.series):(S.inst===2?(sec.series_it||sec.series):sec.series);}
+function mflowOf(){const m=DATA.market;if(!m)return null;return S.inst===1?(m.flow_fi||m.flow):(S.inst===2?(m.flow_it||m.flow):m.flow);}
 
 /* ===== metrics ===== */
 function roll5(s,i){let a=0,c=0;for(let j=Math.max(0,i-WIN+1);j<=i;j++){a+=s[j];c++;}return c?a/c:0;} /* 近5日「日均」淨買超(億/天)，與縱軸同單位 */
@@ -589,10 +605,11 @@ function cum20(s,i){let a=0;for(let j=Math.max(0,i-CUM+1);j<=i;j++)a+=s[j];retur
 /* R7：對日淨買序列做 EMA(span=EMA_SPAN=3，輕平滑) 指數加權平滑，壓掉單日大單造成的假象限翻轉（30.6%→約24.5%），同時不過度拖慢真實轉折。
    平滑只用於 X(位置) 與 Y(動能)，故 Y 仍恰為平滑後 X 的週對週變化（Y=ΔX 自洽不破）；
    sz(近20日累計實際金額) 維持「原始未平滑」，因它代表真實進出的錢，平滑會失真。設計理由見 ADR-0005。 */
-function emaSeries(sec){if(sec._sm==null){const s=sec.series,k=2/(EMA_SPAN+1),o=new Array(s.length);let m=s.length?s[0]:0;for(let i=0;i<s.length;i++){m=s[i]*k+m*(1-k);o[i]=m;}sec._sm=o;}return sec._sm;}
-function metrics(sec,i){const sm=emaSeries(sec);return{x:roll5(sm,i),y:accel(sm,i),sz:cum20(sec.series,i)};}
-/* 各板塊以「自身日淨買超標準差」為尺度，標準化後可跨板塊比較（消除大型股偏誤）；不減均值故正負號不變，象限歸屬與絕對模式一致 */
-function sigma(sec){if(sec._sig==null){const s=sec.series,n=s.length||1;let m=0;for(const v of s)m+=v;m/=n;let q=0;for(const v of s)q+=(v-m)*(v-m);sec._sig=Math.sqrt(q/n)||1;}return sec._sig;}
+function emaSeries(sec){const key='_sm'+S.inst;if(sec[key]==null){const s=serOf(sec),k=2/(EMA_SPAN+1),o=new Array(s.length);let m=s.length?s[0]:0;for(let i=0;i<s.length;i++){m=s[i]*k+m*(1-k);o[i]=m;}sec[key]=o;}return sec[key];}
+function metrics(sec,i){const sm=emaSeries(sec);return{x:roll5(sm,i),y:accel(sm,i),sz:cum20(serOf(sec),i)};}
+/* 各板塊以「自身日淨買超標準差」為尺度，標準化後可跨板塊比較（消除大型股偏誤）；不減均值故正負號不變，象限歸屬與絕對模式一致。
+   σ 與 EMA 快取皆按法人別分開存（_sig0/_sig1/_sig2、_sm0/…），切換法人別時各用自己的尺 */
+function sigma(sec){const key='_sig'+S.inst;if(sec[key]==null){const s=serOf(sec),n=s.length||1;let m=0;for(const v of s)m+=v;m/=n;let q=0;for(const v of s)q+=(v-m)*(v-m);sec[key]=Math.sqrt(q/n)||1;}return sec[key];}
 function mnorm(m,sec){if(!S.norm)return m;const g=sigma(sec);return{x:m.x/g,y:m.y/g,sz:m.sz/g};}
 /* 市場相對(ADR-0010)：當日所有顯示板塊的「平均σ強度(x/σ)」＝大盤共同潮水的σ空間版。市場相對X = 該板塊x/σ − 此平均。 */
 function marketBarAt(i){const ss=curSectors().filter(s=>!S.hidden.has(s.sector));if(!ss.length)return 0;let a=0;for(const sec of ss)a+=metrics(sec,i).x/sigma(sec);return a/ss.length;}
@@ -600,8 +617,8 @@ function metricsAt(sec,pos){const last=LAST(),f=Math.min(last,Math.max(I0,Math.f
   const a=metrics(sec,f);if(r===0||f>=last)return mnorm(a,sec);const b=metrics(sec,f+1);
   return mnorm({x:a.x+(b.x-a.x)*r,y:a.y+(b.y-a.y)*r,sz:a.sz+(b.sz-a.sz)*r},sec);}
 function quad(x,y){if(x>=0&&y>=0)return'chao';if(x>=0)return'lun';if(y>=0)return'guan';return'tui';}
-/* 大盤潮汐：全市場三大法人近5日日均買賣超（億/天）。<0＝退潮（法人在賣大盤）。 */
-function marketRoll5(i){if(!DATA.market||!DATA.market.flow)return null;const f=DATA.market.flow;let a=0,c=0;
+/* 大盤潮汐：全市場法人近5日日均買賣超（億/天），依法人別切換（合計/外資/投信）。<0＝退潮（在賣大盤）。 */
+function marketRoll5(i){const f=mflowOf();if(!f)return null;let a=0,c=0;
   for(let j=Math.max(0,i-WIN+1);j<=i;j++){if(f[j]!=null){a+=f[j];c++;}}return c?a/c:0;}
 /* 逆勢強勢：大盤退潮(tide<0)，但這個板塊自己仍淨流入(x>0)且力道沒減速(y>=0)＝逆勢還在擴大。 */
 function isCounter(m,tide){return tide!=null&&tide<0&&m.x>0&&m.y>=0;}
@@ -609,7 +626,8 @@ const COUNTER_TOPN=5;
 const COUNTER_MIN_SIGMA=1.0;   /* R14：逆勢強勢最低門檻——相對強度需 ≥ 1σ 才算「真的強」，與 R8 中性門檻對齊（見 ADR-0009），濾掉弱盤裡不夠強的矮個 */
 /* 退潮時，從所有「逆勢」候選中，只取相對強度(x/自身σ)最強的前 N 名 —— 消除大小偏誤、限制數量，
    標出的才是「退潮中真正最強」的板塊。回傳板塊名稱陣列。 */
-function counterTops(pos){const f=Math.floor(pos),tide=marketRoll5(f);
+function counterTops(pos){if(S.inst!==0)return [];   /* 逆勢強勢僅在「合計」法人別定義（ADR-0009 的口徑），拆分視角先不擴充 */
+  const f=Math.floor(pos),tide=marketRoll5(f);
   if(!S.counterHi||tide==null||tide>=0)return [];
   const cand=[];
   curSectors().forEach(sec=>{if(S.hidden.has(sec.sector))return;const m=metricsAt(sec,pos);
@@ -628,7 +646,7 @@ function qStreak(sec,i){const q0=quadRawAt(sec,i);let n=1;for(let j=i-1;j>=I0;j-
 const QCOL={chao:'var(--in)',lun:'var(--neu)',guan:'var(--grey)',tui:'var(--out)'};
 function toggleChanges(){S.chgOpen=!S.chgOpen;renderChanges(S.cur);saveState();}
 function renderChanges(i){var el=document.getElementById('changebar');if(!el)return;
-  var head='<span class="chgtitle" onclick="toggleChanges()" title="檢視日 vs 前一交易日的狀態變化（點擊收合/展開）">📋 當日變化 '+(S.chgOpen?'▾':'▸')+'</span>';
+  var head='<span class="chgtitle" onclick="toggleChanges()" title="檢視日 vs 前一交易日的狀態變化（點擊收合/展開）">📋 當日變化'+(S.inst?'（'+INSTNAME[S.inst]+'）':'')+' '+(S.chgOpen?'▾':'▸')+'</span>';
   if(!S.chgOpen){el.innerHTML=head;return;}
   if(i-1<I0){el.innerHTML=head+'<span class="muted">資料起始日，無前一日可比</span>';return;}
   var items=[];
@@ -752,7 +770,7 @@ function updateSummary(){const i=S.cur,snap=snapshot(i).filter(s=>!S.hidden.has(
   var mtw=document.getElementById('mktTideWrap'),mt=document.getElementById('mktTide'),tide=marketRoll5(i);
   if(mtw)mtw.style.display=(tide==null)?'none':'';
   if(mt&&tide!=null){var neg=tide<0,tops=counterTops(i);
-    mt.innerHTML=(neg?'退潮':'漲潮')+' '+fmt(tide)+' 億/天'+((neg&&S.counterHi&&tops.length)?(' ｜ 逆勢強勢 <b style="color:#ffd24a">'+tops.join('、')+'</b>'):(neg&&S.counterHi?' ｜ 逆勢強勢 無':''));
+    mt.innerHTML=(S.inst?'（'+INSTNAME[S.inst]+'）':'')+(neg?'退潮':'漲潮')+' '+fmt(tide)+' 億/天'+((neg&&S.counterHi&&S.inst===0&&tops.length)?(' ｜ 逆勢強勢 <b style="color:#ffd24a">'+tops.join('、')+'</b>'):(neg&&S.counterHi&&S.inst===0?' ｜ 逆勢強勢 無':''));
     mt.style.color=neg?'var(--out)':'var(--in)';}
   const c={chao:0,lun:0,guan:0,tui:0};snap.forEach(s=>c[s.q]++);
   // 依圖上實際方位排：左上觀望／右上漲潮／左下退潮／右下輪動
@@ -781,7 +799,7 @@ function alignQuadBar(){var svg=document.getElementById('svg'),qmap=document.get
 function showTip(e,sec){const i=S.cur,m=metrics(sec,i),mb=(S.scale===2)?marketBarAt(i):0,xq=(S.scale===2)?m.x/sigma(sec)-mb:m.x,q=quad(xq,m.y);
   const tip=document.getElementById('tip'),wrap=document.getElementById('stage').getBoundingClientRect();
   tip.style.display='block';
-  tip.innerHTML=`<b>${sec.sector}</b>
+  tip.innerHTML=`<b>${sec.sector}</b>${S.inst?` <span style="color:var(--accent);font-size:.85em">${INSTNAME[S.inst]}</span>`:''}
    <div class="l"><span>近5日日均(平滑)</span><span style="color:${m.x>=0?'var(--in)':'var(--out)'}">${fmt(m.x)} 億/天</span></div>
    <div class="l"><span>近20日累計</span><span style="color:${m.sz>=0?'var(--in)':'var(--out)'}">${fmt(m.sz)} 億</span></div>
    <div class="l"><span>動能(力道變化)</span><span style="color:${m.y>=0?'var(--in)':'var(--out)'}">${fmt(m.y)} 億/天</span></div>
@@ -936,14 +954,14 @@ function setRange(r){S.range=r;document.querySelectorAll('#rangeSel button').for
 
 /* ===== heatmap (within window) ===== */
 function renderHeat(){const ws=winStart(),we=LAST();const dts=DATA.dates.slice(ws,we+1);
-  const secs=curSectors().filter(s=>!S.hidden.has(s.sector)).sort((a,b)=>cum20(b.series,we)-cum20(a.series,we));
-  let cap=1;secs.forEach(s=>{for(let i=ws;i<=we;i++)cap=Math.max(cap,Math.abs(s.series[i]));});cap=Math.min(cap,300);
+  const secs=curSectors().filter(s=>!S.hidden.has(s.sector)).sort((a,b)=>cum20(serOf(b),we)-cum20(serOf(a),we));
+  let cap=1;secs.forEach(s=>{for(let i=ws;i<=we;i++)cap=Math.max(cap,Math.abs(serOf(s)[i]));});cap=Math.min(cap,300);
   function cell(v){const t=Math.max(-1,Math.min(1,v/cap)),inflow=t>=0,red=(S.color==='tw')?inflow:!inflow,a=Math.abs(t);
     if(a<0.02)return'background:#1a261f';return`background:${red?`rgba(224,106,60,${0.15+a*0.85})`:`rgba(39,169,120,${0.15+a*0.85})`}`;}
   let h='<table><thead><tr><th class="rowlab">板塊</th>';
   dts.forEach(d=>h+=`<th class="colh"><span>${mmdd(d)}</span></th>`);h+='<th class="sumcol">區間累計</th></tr></thead><tbody>';
-  secs.forEach(s=>{h+=`<tr><td class="rowlab">${s.sector}</td>`;let sum=0;
-    for(let i=ws;i<=we;i++){const v=s.series[i];sum+=v;h+=`<td><div class="cell" style="${cell(v)}" title="${mmdd(DATA.dates[i])} ${fmt(v)}億"></div></td>`;}
+  secs.forEach(s=>{h+=`<tr><td class="rowlab">${s.sector}</td>`;let sum=0;const ser=serOf(s);
+    for(let i=ws;i<=we;i++){const v=ser[i];sum+=v;h+=`<td><div class="cell" style="${cell(v)}" title="${mmdd(DATA.dates[i])} ${fmt(v)}億"></div></td>`;}
     h+=`<td class="sumcol" style="color:${(sum>=0)===(S.color==='tw')?'var(--in)':'var(--out)'}">${fmt(sum)}</td></tr>`;});
   h+='</tbody></table>';document.getElementById('heat').innerHTML=h;}
 
@@ -979,6 +997,15 @@ function setColor(c){S.color=c;document.getElementById('cTW').classList.toggle('
 function setScale(n){S.scale=n;S.norm=n>=1;
   document.querySelectorAll('#normSel button').forEach(b=>b.classList.toggle('on',+b.dataset.n===n));
   computeDomain();buildMap();setPos(S.pos);if(S.tab==='rank')renderRank();alignQuadBar();}
+/* 法人別切換（A案）：整張圖改用該法人別序列重算（EMA/σ 快取按法人別分開，切換即生效） */
+function setInst(n){S.inst=n;
+  document.querySelectorAll('#instSel button').forEach(b=>b.classList.toggle('on',+b.dataset.i===n));
+  computeDomain();buildMap();setPos(S.pos);updateSummary();
+  if(S.tab==='heat')renderHeat();if(S.tab==='rank')renderRank();alignQuadBar();saveState();}
+function syncInstSel(){var el=document.getElementById('instSel');if(!el)return;
+  var ok=hasInst();el.style.display=ok?'':'none';
+  if(!ok)S.inst=0;   /* 舊 data.json 無分項 → 退回合計並隱藏切換鈕 */
+  document.querySelectorAll('#instSel button').forEach(b=>b.classList.toggle('on',+b.dataset.i===S.inst));}
 /* 若當前維度尚無任何釘選，預設釘選近20日資金量前三大（讓切換後不會空白） */
 function autoPinTop3(){const cur=curSectors();if(cur.some(s=>S.pinned.has(s.sector)))return;
   [...cur].sort((a,b)=>Math.abs(cum20(b.series,LAST()))-Math.abs(cum20(a.series,LAST()))).slice(0,3).forEach(s=>S.pinned.add(s.sector));}
@@ -1018,7 +1045,7 @@ function closeModal(id){document.getElementById(id).classList.remove('show');}
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('show');}));
 
 /* ===== persistence (記住使用者的釘選與設定) ===== */
-function saveState(){try{localStorage.setItem('tide_state',JSON.stringify({color:S.color,range:S.range,trail:S.trail,norm:S.norm,scale:S.scale,dim:S.dim,ksideW:S.ksideW,showIndex:S.showIndex,counterHi:S.counterHi,chgOpen:S.chgOpen,kmode:S.kmode,pinned:[...S.pinned],hidden:[...S.hidden]}));}catch(e){}}
+function saveState(){try{localStorage.setItem('tide_state',JSON.stringify({color:S.color,range:S.range,trail:S.trail,norm:S.norm,scale:S.scale,dim:S.dim,ksideW:S.ksideW,showIndex:S.showIndex,counterHi:S.counterHi,chgOpen:S.chgOpen,inst:S.inst,kmode:S.kmode,pinned:[...S.pinned],hidden:[...S.hidden]}));}catch(e){}}
 function loadState(){try{var j=JSON.parse(localStorage.getItem('tide_state'));if(!j)return;
   if(j.color)S.color=j.color;if(j.range)S.range=j.range;
   if(typeof j.trail==='number')S.trail=j.trail;
@@ -1029,6 +1056,7 @@ function loadState(){try{var j=JSON.parse(localStorage.getItem('tide_state'));if
   if(typeof j.showIndex==='boolean')S.showIndex=j.showIndex;
   if(typeof j.counterHi==='boolean')S.counterHi=j.counterHi;
   if(typeof j.chgOpen==='boolean')S.chgOpen=j.chgOpen;
+  if(j.inst===0||j.inst===1||j.inst===2)S.inst=j.inst;
   if(j.kmode)S.kmode=j.kmode;
   if(Array.isArray(j.pinned))S.pinned=new Set(j.pinned);
   if(Array.isArray(j.hidden))S.hidden=new Set(j.hidden);}catch(e){}}
@@ -1057,6 +1085,7 @@ function init(){
   document.querySelectorAll('#dimSel button').forEach(b=>b.classList.toggle('on',b.dataset.d===S.dim));
   updateKsideText();
   var cb=document.getElementById('counterBtn');if(cb){cb.style.display=DATA.market?'':'none';updateCounterBtn();}
+  syncInstSel();   // A案：無法人分項資料時隱藏切換鈕並退回合計
   computeDomain();buildMap();
   autoPinTop3();   // 當前維度若無釘選，預設前三大（dim-aware）
   renderToggles();
@@ -1092,6 +1121,7 @@ function applyData(d){DATA=d;SECID={};DATA.sectors.forEach(function(s,i){SECID[s
   document.querySelectorAll('#dimSel button').forEach(function(b){b.classList.toggle('on',b.dataset.d===S.dim);});
   updateKsideText();
   var cb=document.getElementById('counterBtn');if(cb){cb.style.display=DATA.market?'':'none';updateCounterBtn();}
+  syncInstSel();
   computeDomain();buildMap();autoPinTop3();renderToggles();renderKside();setRange(S.range);updatedLabel();}
 function boot(){fetch('data.json',{cache:'no-store'}).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(d){DATA=d;}).catch(function(){}).then(function(){init();updatedLabel();});}
 function reload(){var b=document.getElementById('refreshBtn');if(b)b.textContent='\u23f3';fetch('data.json',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){applyData(d);}).catch(function(){}).then(function(){if(b)b.textContent='\ud83d\udd04';});}

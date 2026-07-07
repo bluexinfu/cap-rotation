@@ -214,11 +214,15 @@ table.rank{width:100%;border-collapse:collapse;font-size:.88em}
 .guidebar b{color:var(--txt)} .guidebar .sep{color:var(--muted2);margin:0 -8px}
 .guidebar .pos{color:var(--in);font-weight:700} .guidebar .neg{color:var(--out);font-weight:700}
 /* 當日變化列（B案）：檢視日 vs 前一交易日的狀態轉移紀錄（換象限/逆勢名單進出/潮汐翻轉）。純狀態陳述、非訊號 */
-.changebar{display:flex;flex-wrap:wrap;gap:3px 12px;padding:6px 16px;font-size:.75em;color:var(--txt);
-  border-bottom:1px solid var(--line);background:var(--bg2);align-items:center}
-.changebar .chgtitle{color:var(--accent);font-weight:700;cursor:pointer;user-select:none;white-space:nowrap}
+/* 固定2行＋內部捲動：title/note 固定，內容區(.chgitems)鎖定 2 行高、爆量日在區塊內捲動，
+   播放逐日切換時高度恆定，不再擠壓下方圖表（消除閃動）。 */
+.changebar{display:flex;flex-wrap:nowrap;gap:0 12px;padding:6px 16px;font-size:.75em;color:var(--txt);
+  border-bottom:1px solid var(--line);background:var(--bg2);align-items:flex-start}
+.changebar .chgtitle{color:var(--accent);font-weight:700;cursor:pointer;user-select:none;white-space:nowrap;flex:0 0 auto}
+.changebar .chgitems{flex:1 1 auto;min-width:0;display:flex;flex-wrap:wrap;gap:3px 12px;align-content:flex-start;
+  line-height:1.5;height:calc(1.5em * 2 + 3px);overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
 .changebar .sep{color:var(--muted2);margin:0 -6px}
-.changebar .chgnote{margin-left:auto;color:var(--muted2);font-size:.9em;white-space:nowrap}
+.changebar .chgnote{color:var(--muted2);font-size:.9em;white-space:nowrap;flex:0 0 auto}
 .guide{font-size:.92em;line-height:1.72}
 .guide h4{margin:17px 0 6px;font-size:1.02em;color:var(--accent)}
 .guide h4:first-of-type{margin-top:2px}
@@ -659,8 +663,9 @@ const QCOL={chao:'var(--in)',lun:'var(--neu)',guan:'var(--grey)',tui:'var(--out)
 function toggleChanges(){S.chgOpen=!S.chgOpen;renderChanges(S.cur);saveState();}
 function renderChanges(i){var el=document.getElementById('changebar');if(!el)return;
   var head='<span class="chgtitle" onclick="toggleChanges()" title="檢視日 vs 前一交易日的狀態變化（點擊收合/展開）">📋 當日變化'+(S.inst?'（'+INSTNAME[S.inst]+'）':'')+' '+(S.chgOpen?'▾':'▸')+'</span>';
+  var note='<span class="chgnote">狀態紀錄非訊號 · 單日翻轉常見，配合軌跡看趨勢</span>';
   if(!S.chgOpen){el.innerHTML=head;return;}
-  if(i-1<I0){el.innerHTML=head+'<span class="muted">資料起始日，無前一日可比</span>';return;}
+  if(i-1<I0){el.innerHTML=head+'<div class="chgitems"><span class="muted">資料起始日，無前一日可比</span></div>'+note;return;}
   var items=[];
   var t0=marketRoll5(i-1),t1=marketRoll5(i);
   if(t0!=null&&t1!=null&&(t0<0)!==(t1<0))
@@ -672,8 +677,9 @@ function renderChanges(i){var el=document.getElementById('changebar');if(!el)ret
     c.forEach(function(n){if(!p.has(n))io.push('<b style="color:#ffd24a">＋'+n+'</b>');});
     p.forEach(function(n){if(!cs.has(n))io.push('<span class="muted">－'+n+'</span>');});
     if(io.length)items.push('<span>🌊 逆勢強勢 '+io.join(' ')+'</span>');}
-  el.innerHTML=head+(items.length?items.join('<span class="sep">｜</span>'):'<span class="muted">無象限變化</span>')
-    +'<span class="chgnote">狀態紀錄非訊號 · 單日翻轉常見，配合軌跡看趨勢</span>';}
+  el.innerHTML=head+'<div class="chgitems">'
+    +(items.length?items.join('<span class="sep">｜</span>'):'<span class="muted">無象限變化</span>')
+    +'</div>'+note;}
 
 /* ===== 量價背離觀察標記（C案/R9，ADR-0011）=====
    只標「資金流與類股指數兩條線不同步」這個事實，不做多空解讀（紅線見 ADR-0011）。
